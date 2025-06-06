@@ -94,61 +94,71 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
 
   // Get primary metric to display based on type
   const getPrimaryMetric = () => {
+    const formatScore = (val) =>
+      typeof val === "number" ? `${val.toFixed(2)}/100` : val;
+
     switch(processedAssessment.type) {
       case 'tremor':
         return {
           label: 'Severity',
-          value: processedAssessment.metrics.severity || 'N/A'
+          value: formatScore(processedAssessment.metrics.severity || 0)
         };
       case 'speechPattern': {
-        // Get the overall score from any of these possible locations
-        const overallScore = 
-          processedAssessment.metrics.overallScore || 
+        const overallScore =
+          processedAssessment.metrics.overallScore ||
           processedAssessment.metrics.overall?.compositeScore ||
-          (processedAssessment.metrics.clarity?.score ? 
+          (processedAssessment.metrics.clarity?.score ?
             processedAssessment.metrics.clarity.score : 0);
-        
+
         return {
           label: 'Overall Score',
-          value: `${overallScore}/100`
+          value: formatScore(overallScore)
         };
       }
-      case 'responseTime':
+      case 'responseTime': {
+        // Show response time in ms if it's a number
+        const avg = processedAssessment.metrics.averageResponseTime;
+        let value = 'N/A';
+        if (typeof avg === 'number') {
+          value = `${avg.toFixed(2)} ms`;
+        } else if (avg) {
+          value = avg;
+        }
         return {
           label: 'Avg. Response Time',
-          value: processedAssessment.metrics.averageResponseTime || 'N/A'
+          value
         };
+      }
       case 'neckMobility':
         return {
           label: 'Mobility Score',
-          value: `${processedAssessment.metrics.overall?.mobilityScore || 0}/100`
+          value: formatScore(processedAssessment.metrics.overall?.mobilityScore || 0)
         };
       case 'gaitAnalysis':
         return {
           label: 'Stability Score',
-          value: `${processedAssessment.metrics.overall?.stabilityScore || 0}/100`
+          value: formatScore(processedAssessment.metrics.overall?.stabilityScore || 0)
         };
       case 'fingerTapping':
         return {
           label: 'Overall Score',
-          value: `${processedAssessment.metrics.overallScore || 0}/100`
+          value: formatScore(processedAssessment.metrics.overallScore || 0)
         };
       case 'facialSymmetry': {
-        // Check multiple possible locations for symmetry score
-        const symmetryScore = 
-          processedAssessment.symmetry_score || 
-          processedAssessment.metrics.symmetryScore || 
-          processedAssessment.metrics.symmetry_score || 
+        const symmetryScore =
+          processedAssessment.symmetry_score ||
+          processedAssessment.metrics.symmetryScore ||
+          processedAssessment.metrics.symmetry_score ||
           0;
         return {
           label: 'Symmetry Score',
-          value: `${symmetryScore}/1000`
+          value: formatScore(symmetryScore)
         };
       }
       case 'eyeMovement':
         return {
           label: 'Composite Score',
-          value: `${processedAssessment.metrics.overall?.compositeScore || 0}/100`
+          value: formatScore(processedAssessment.metrics.overall?.compositeScore || 0)
         };
       default:
         return {
@@ -160,16 +170,18 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
 
   // Get secondary metrics based on type
   const getSecondaryMetrics = () => {
+    const formatScore = (val) =>
+      typeof val === "number" ? `${val.toFixed(2)}/100` : val;
+
     switch(processedAssessment.type) {
       case 'tremor': {
-        // Handle possible variations in field names
-        const tremor_frequency = processedAssessment.metrics.tremor_frequency || 
+        const tremor_frequency = processedAssessment.metrics.tremor_frequency ||
                                 processedAssessment.metrics.frequency || 0;
-        const tremor_amplitude = processedAssessment.metrics.tremor_amplitude || 
+        const tremor_amplitude = processedAssessment.metrics.tremor_amplitude ||
                                 processedAssessment.metrics.amplitude || 0;
-        const tremor_type = processedAssessment.metrics.tremor_type || 
+        const tremor_type = processedAssessment.metrics.tremor_type ||
                            processedAssessment.metrics.type || 'N/A';
-                           
+
         return [
           { label: 'Frequency', value: `${tremor_frequency} Hz` },
           { label: 'Amplitude', value: tremor_amplitude },
@@ -177,25 +189,24 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
         ];
       }
       case 'speechPattern': {
-        // Extract metrics, handling possible variations in data structure
-        const clarityScore = typeof processedAssessment.metrics.clarity === 'object' ? 
-                           processedAssessment.metrics.clarity.score : 
+        const clarityScore = typeof processedAssessment.metrics.clarity === 'object' ?
+                           processedAssessment.metrics.clarity.score :
                            processedAssessment.metrics.clarity || 0;
-                           
-        const wordsPerMinute = processedAssessment.metrics.speechRate?.wordsPerMinute || 
-                             processedAssessment.metrics.words_per_minute || 
+
+        const wordsPerMinute = processedAssessment.metrics.speechRate?.wordsPerMinute ||
+                             processedAssessment.metrics.words_per_minute ||
                              processedAssessment.metrics.speech_rate || 0;
-                             
+
         const volumeScore = typeof processedAssessment.metrics.volumeControl === 'object' ?
                           processedAssessment.metrics.volumeControl.score :
-                          processedAssessment.metrics.volumeControl || 
-                          processedAssessment.metrics.volume_control || 
+                          processedAssessment.metrics.volumeControl ||
+                          processedAssessment.metrics.volume_control ||
                           processedAssessment.metrics.volume || 0;
-                  
+
         return [
-          { label: 'Clarity', value: `${clarityScore}/100` },
+          { label: 'Clarity', value: formatScore(clarityScore) },
           { label: 'Speech Rate', value: `${wordsPerMinute} WPM` },
-          { label: 'Volume Control', value: `${volumeScore}/100` }
+          { label: 'Volume Control', value: formatScore(volumeScore) }
         ];
       }
       case 'responseTime':
@@ -205,15 +216,15 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
           { label: 'Completed', value: `${processedAssessment.metrics.completedRounds || 0}/${processedAssessment.metrics.totalRounds || 0}` }
         ];
       case 'neckMobility': {
-        const flexion = processedAssessment.metrics.flexion?.degrees || 
+        const flexion = processedAssessment.metrics.flexion?.degrees ||
                       processedAssessment.metrics.flexion || 0;
-        const extension = processedAssessment.metrics.extension?.degrees || 
+        const extension = processedAssessment.metrics.extension?.degrees ||
                         processedAssessment.metrics.extension || 0;
-        const leftRotation = processedAssessment.metrics.rotation?.left?.degrees || 
+        const leftRotation = processedAssessment.metrics.rotation?.left?.degrees ||
                            processedAssessment.metrics.left_rotation || 0;
-        const rightRotation = processedAssessment.metrics.rotation?.right?.degrees || 
+        const rightRotation = processedAssessment.metrics.rotation?.right?.degrees ||
                             processedAssessment.metrics.right_rotation || 0;
-        
+
         return [
           { label: 'Flexion', value: `${flexion}°` },
           { label: 'Extension', value: `${extension}°` },
@@ -222,17 +233,17 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
         ];
       }
       case 'gaitAnalysis': {
-        const stability = processedAssessment.metrics.stability?.score || 
+        const stability = processedAssessment.metrics.stability?.score ||
                         processedAssessment.metrics.stability || 0;
-        const balance = processedAssessment.metrics.balance?.score || 
+        const balance = processedAssessment.metrics.balance?.score ||
                       processedAssessment.metrics.balance || 0;
-        const symmetry = processedAssessment.metrics.symmetry?.overall || 
+        const symmetry = processedAssessment.metrics.symmetry?.overall ||
                        processedAssessment.metrics.symmetry || 0;
-        
+
         return [
-          { label: 'Stability', value: `${stability}/1000` },
-          { label: 'Balance', value: `${balance}/1000` },
-          { label: 'Symmetry', value: `${symmetry}/1000` }
+          { label: 'Stability', value: formatScore(stability) },
+          { label: 'Balance', value: formatScore(balance) },
+          { label: 'Symmetry', value: formatScore(symmetry) }
         ];
       }
       case 'fingerTapping': {
@@ -240,37 +251,37 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
         const amplitude = processedAssessment.metrics.amplitude || 0;
         const rhythm = processedAssessment.metrics.rhythm || 0;
         const accuracy = processedAssessment.metrics.accuracy || 0;
-        
+
         return [
-          { label: 'Frequency', value: `${frequency}/100` },
-          { label: 'Amplitude', value: `${amplitude}/100` },
-          { label: 'Rhythm', value: `${rhythm}/100` },
-          { label: 'Accuracy', value: `${accuracy}/100` }
+          { label: 'Frequency', value: formatScore(frequency) },
+          { label: 'Amplitude', value: formatScore(amplitude) },
+          { label: 'Rhythm', value: formatScore(rhythm) },
+          { label: 'Accuracy', value: formatScore(accuracy) }
         ];
       }
       case 'facialSymmetry': {
-        const eyeSymmetry = processedAssessment.metrics.eye_symmetry || 
+        const eyeSymmetry = processedAssessment.metrics.eye_symmetry ||
                           processedAssessment.metrics.eyeSymmetry || 0;
-        const mouthSymmetry = processedAssessment.metrics.mouth_symmetry || 
+        const mouthSymmetry = processedAssessment.metrics.mouth_symmetry ||
                             processedAssessment.metrics.mouthSymmetry || 0;
-        const jawSymmetry = processedAssessment.metrics.jaw_symmetry || 
+        const jawSymmetry = processedAssessment.metrics.jaw_symmetry ||
                           processedAssessment.metrics.jawSymmetry || 0;
-        
+
         return [
-          { label: 'Eye Symmetry', value: `${eyeSymmetry}/100` },
-          { label: 'Mouth Symmetry', value: `${mouthSymmetry}/100` },
-          { label: 'Jaw Symmetry', value: `${jawSymmetry}/100` }
+          { label: 'Eye Symmetry', value: formatScore(eyeSymmetry) },
+          { label: 'Mouth Symmetry', value: formatScore(mouthSymmetry) },
+          { label: 'Jaw Symmetry', value: formatScore(jawSymmetry) }
         ];
       }
       case 'eyeMovement': {
         const velocityScore = processedAssessment.metrics.overall?.velocityScore || 0;
         const accuracyScore = processedAssessment.metrics.overall?.accuracyScore || 0;
         const smoothnessScore = processedAssessment.metrics.overall?.smoothnessScore || 0;
-        
+
         return [
-          { label: 'Velocity', value: `${velocityScore}/100` },
-          { label: 'Accuracy', value: `${accuracyScore}/100` },
-          { label: 'Smoothness', value: `${smoothnessScore}/100` }
+          { label: 'Velocity', value: formatScore(velocityScore) },
+          { label: 'Accuracy', value: formatScore(accuracyScore) },
+          { label: 'Smoothness', value: formatScore(smoothnessScore) }
         ];
       }
       default:

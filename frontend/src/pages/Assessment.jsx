@@ -177,12 +177,14 @@ const Assessment = () => {
       color: '#ff9800' // Orange
     }
   ];
-
   // Function to check if an assessment is available
   const isAssessmentAvailable = (index) => {
-    if (index === 0) return true; // First assessment is always available
+    // Modified for testing: All assessments are available
+    return true;
+    // Original logic:
+    // if (index === 0) return true; // First assessment is always available
     // Assessment is available if previous assessment is completed
-    return completedAssessments.includes(assessmentTypes[index - 1].id);
+    // return completedAssessments.includes(assessmentTypes[index - 1].id);
   };
 
   // Function to check if assessment is completed

@@ -330,14 +330,10 @@ export const analyzeSpeech = () => {
 // Initialize TensorFlow
 initTensorFlow().catch(console.error);
 
-const ML_SERVICE_URL = import.meta.env.DEV 
-  ? 'http://localhost:8000' 
-  : import.meta.env.VITE_ML_SERVICE_URL || "https://smarth-ml-service.onrender.com";
+const CENTRALIZED_ML_SERVICE_URL = "https://samarth-ml-service-439314052903.us-central1.run.app/";
 
 export const MLService = {
-  BASE_URL: import.meta.env.DEV 
-    ? 'http://localhost:8000' 
-    : import.meta.env.VITE_ML_SERVICE_URL || "https://smarth-ml-service.onrender.com",
+  BASE_URL: CENTRALIZED_ML_SERVICE_URL,
 
   analyzeEyes: async function(videoBlob, phase) {
     const formData = new FormData();
@@ -446,7 +442,7 @@ export const MLService = {
         formData.append('file', videoBlob, 'tremor.webm');
 
         try {
-            const response = await fetch(`${ML_SERVICE_URL}/analyze/tremor`, {
+            const response = await fetch(`${this.BASE_URL}/analyze/tremor`, {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -475,7 +471,7 @@ export const MLService = {
             const formData = new FormData();
             formData.append('frame', imageBlob, 'frame.jpg');
 
-            const response = await fetch(`${ML_SERVICE_URL}/analyze/neck/set-neutral`, {
+            const response = await fetch(`${this.BASE_URL}/analyze/neck/set-neutral`, {
                 method: 'POST',
                 body: formData
             });
@@ -504,7 +500,7 @@ export const MLService = {
             formData.append('frame', imageBlob, 'frame.jpg');
             formData.append('position', position);
 
-            const response = await fetch(`${ML_SERVICE_URL}/analyze/neck/measure`, {
+            const response = await fetch(`${this.BASE_URL}/analyze/neck/measure`, {
                 method: 'POST',
                 body: formData
             });
@@ -527,7 +523,7 @@ export const MLService = {
      */
     async getNeckMobilityResults() {
         try {
-            const response = await fetch(`${ML_SERVICE_URL}/analyze/neck/results`);
+            const response = await fetch(`${this.BASE_URL}/analyze/neck/results`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
