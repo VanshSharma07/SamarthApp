@@ -201,7 +201,7 @@ const Layout = ({ children }) => {
               src="/images/loogo.png"
               alt="Samarth Logo"
               sx={{ 
-                height: 100,
+                height: 60,
                 mr: 1.5,
                 // Optional filter for dark mode if you don't have a separate logo file
                 filter: theme.palette.mode === 'dark' ? 'brightness(1.2) contrast(1.1)' : 'none',
