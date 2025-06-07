@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://samarthbackend.onrender.com/api';
+const API_URL = 'https://samarth-backend-233596067763.us-central1.run.app/api';
 
 // Create axios instance
 const api = axios.create({
