@@ -5,11 +5,19 @@ import {
   TextField, 
   Button, 
   Typography, 
-  Alert, 
-  Paper,
-  Link
+  Alert,
+  InputAdornment,
+  IconButton,
+  Grid
 } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { 
+  Visibility, 
+  VisibilityOff, 
+  Email, 
+  Lock, 
+  Person,
+  PersonOutline 
+} from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Signup = () => {
@@ -20,6 +28,8 @@ const Signup = () => {
     password: '',
     confirmPassword: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
@@ -43,6 +53,10 @@ const Signup = () => {
       return setError("Passwords don't match");
     }
 
+    if (password.length < 6) {
+      return setError("Password must be at least 6 characters long");
+    }
+
     try {
       setLoading(true);
       await signup(email, password, { firstName, lastName });
@@ -58,167 +72,343 @@ const Signup = () => {
     }
   };
 
+  const handleClickShowPassword = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const handleClickShowConfirmPassword = () => {
+    setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const handleMouseDownPassword = (event) => {
+    event.preventDefault();
+  };
+
   return (
-    <Box sx={{ 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      minHeight: '100vh',
-      bgcolor: '#0f172a',
-      backgroundImage: 'radial-gradient(circle, rgba(10,10,25,0.8) 0%, rgba(15,23,42,1) 100%)',
-      p: 2
-    }}>
-      <Paper sx={{ 
-        p: 4, 
-        maxWidth: 450, 
-        width: '100%', 
-        borderRadius: 3, 
-        backdropFilter: 'blur(10px)',
-        background: 'rgba(255, 255, 255, 0.1)',
-        boxShadow: '0 8px 32px rgba(31, 38, 135, 0.37)',
-        border: '1px solid rgba(255, 255, 255, 0.18)',
-        color: '#ffffff'
-      }}>
-        <Typography variant="h4" component="h1" gutterBottom textAlign="center" sx={{ color: '#ffffff' }}>
-          Sign Up
-        </Typography>
+    <Box>
+      {error && (
+        <Alert 
+          severity="error" 
+          sx={{ 
+            mb: 3,
+            bgcolor: '#ffebee',
+            color: '#c62828',
+            '& .MuiAlert-icon': {
+              color: '#f44336'
+            }
+          }}
+        >
+          {error}
+        </Alert>
+      )}
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2, bgcolor: 'rgba(255, 0, 0, 0.2)', color: '#ff4d4d' }}>
-            {error}
-          </Alert>
-        )}
+      <Box component="form" onSubmit={handleSubmit}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="First Name"
+              name="firstName"
+              fullWidth
+              margin="normal"
+              value={formData.firstName}
+              onChange={handleChange}
+              required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Person sx={{ color: '#4caf50' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '& fieldset': { 
+                    borderColor: '#c8e6c9',
+                    borderWidth: 2
+                  },
+                  '&:hover fieldset': { 
+                    borderColor: '#81c784' 
+                  },
+                  '&.Mui-focused fieldset': { 
+                    borderColor: '#4caf50',
+                    borderWidth: 2
+                  }
+                },
+                '& .MuiInputLabel-root': {
+                  color: '#4caf50',
+                  fontWeight: 500
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: '#2e7d32'
+                }
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Last Name"
+              name="lastName"
+              fullWidth
+              margin="normal"
+              value={formData.lastName}
+              onChange={handleChange}
+              required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonOutline sx={{ color: '#4caf50' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '& fieldset': { 
+                    borderColor: '#c8e6c9',
+                    borderWidth: 2
+                  },
+                  '&:hover fieldset': { 
+                    borderColor: '#81c784' 
+                  },
+                  '&.Mui-focused fieldset': { 
+                    borderColor: '#4caf50',
+                    borderWidth: 2
+                  }
+                },
+                '& .MuiInputLabel-root': {
+                  color: '#4caf50',
+                  fontWeight: 500
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: '#2e7d32'
+                }
+              }}
+            />
+          </Grid>
+        </Grid>
 
-        <Box component="form" onSubmit={handleSubmit}>
-          <TextField
-            label="First Name"
-            name="firstName"
-            fullWidth
-            margin="normal"
-            value={formData.firstName}
-            onChange={handleChange}
-            required
-            InputProps={{ style: { color: '#fff' } }}
-            sx={{ 
-              input: { color: '#ffffff' },
-              label: { color: '#9ca3af' },
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: '#3b82f6' },
-                '&:hover fieldset': { borderColor: '#60a5fa' },
-                '&.Mui-focused fieldset': { borderColor: '#93c5fd' }
+        <TextField
+          label="Email Address"
+          name="email"
+          type="email"
+          fullWidth
+          margin="normal"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Email sx={{ color: '#4caf50' }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            mb: 2,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              '& fieldset': { 
+                borderColor: '#c8e6c9',
+                borderWidth: 2
+              },
+              '&:hover fieldset': { 
+                borderColor: '#81c784' 
+              },
+              '&.Mui-focused fieldset': { 
+                borderColor: '#4caf50',
+                borderWidth: 2
               }
-            }}
-          />
+            },
+            '& .MuiInputLabel-root': {
+              color: '#4caf50',
+              fontWeight: 500
+            },
+            '& .MuiInputLabel-root.Mui-focused': {
+              color: '#2e7d32'
+            }
+          }}
+        />
 
-          <TextField
-            label="Last Name"
-            name="lastName"
-            fullWidth
-            margin="normal"
-            value={formData.lastName}
-            onChange={handleChange}
-            required
-            InputProps={{ style: { color: '#fff' } }}
-            sx={{ 
-              input: { color: '#ffffff' },
-              label: { color: '#9ca3af' },
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: '#3b82f6' },
-                '&:hover fieldset': { borderColor: '#60a5fa' },
-                '&.Mui-focused fieldset': { borderColor: '#93c5fd' }
+        <TextField
+          label="Password"
+          name="password"
+          type={showPassword ? 'text' : 'password'}
+          fullWidth
+          margin="normal"
+          value={formData.password}
+          onChange={handleChange}
+          required
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Lock sx={{ color: '#4caf50' }} />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label="toggle password visibility"
+                  onClick={handleClickShowPassword}
+                  onMouseDown={handleMouseDownPassword}
+                  edge="end"
+                  sx={{ color: '#4caf50' }}
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            mb: 2,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              '& fieldset': { 
+                borderColor: '#c8e6c9',
+                borderWidth: 2
+              },
+              '&:hover fieldset': { 
+                borderColor: '#81c784' 
+              },
+              '&.Mui-focused fieldset': { 
+                borderColor: '#4caf50',
+                borderWidth: 2
               }
-            }}
-          />
+            },
+            '& .MuiInputLabel-root': {
+              color: '#4caf50',
+              fontWeight: 500
+            },
+            '& .MuiInputLabel-root.Mui-focused': {
+              color: '#2e7d32'
+            }
+          }}
+        />
 
-          <TextField
-            label="Email"
-            name="email"
-            type="email"
-            fullWidth
-            margin="normal"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            InputProps={{ style: { color: '#fff' } }}
-            sx={{ 
-              input: { color: '#ffffff' },
-              label: { color: '#9ca3af' },
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: '#3b82f6' },
-                '&:hover fieldset': { borderColor: '#60a5fa' },
-                '&.Mui-focused fieldset': { borderColor: '#93c5fd' }
+        <TextField
+          label="Confirm Password"
+          name="confirmPassword"
+          type={showConfirmPassword ? 'text' : 'password'}
+          fullWidth
+          margin="normal"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          required
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Lock sx={{ color: '#4caf50' }} />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label="toggle confirm password visibility"
+                  onClick={handleClickShowConfirmPassword}
+                  onMouseDown={handleMouseDownPassword}
+                  edge="end"
+                  sx={{ color: '#4caf50' }}
+                >
+                  {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            mb: 3,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              '& fieldset': { 
+                borderColor: '#c8e6c9',
+                borderWidth: 2
+              },
+              '&:hover fieldset': { 
+                borderColor: '#81c784' 
+              },
+              '&.Mui-focused fieldset': { 
+                borderColor: '#4caf50',
+                borderWidth: 2
               }
-            }}
-          />
+            },
+            '& .MuiInputLabel-root': {
+              color: '#4caf50',
+              fontWeight: 500
+            },
+            '& .MuiInputLabel-root.Mui-focused': {
+              color: '#2e7d32'
+            }
+          }}
+        />
 
-          <TextField
-            label="Password"
-            name="password"
-            type="password"
-            fullWidth
-            margin="normal"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            InputProps={{ style: { color: '#fff' } }}
-            sx={{ 
-              input: { color: '#ffffff' },
-              label: { color: '#9ca3af' },
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: '#3b82f6' },
-                '&:hover fieldset': { borderColor: '#60a5fa' },
-                '&.Mui-focused fieldset': { borderColor: '#93c5fd' }
-              }
-            }}
-          />
+        <Button
+          type="submit"
+          variant="contained"
+          fullWidth
+          disabled={loading}
+          sx={{ 
+            mt: 2,
+            mb: 2,
+            py: 1.5,
+            borderRadius: 2,
+            background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+            '&:hover': { 
+              background: 'linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)',
+              transform: 'translateY(-1px)',
+              boxShadow: '0 6px 20px rgba(46, 125, 50, 0.3)'
+            },
+            '&:disabled': {
+              background: '#c8e6c9',
+              color: '#ffffff'
+            },
+            fontWeight: 600,
+            fontSize: '1rem',
+            textTransform: 'none',
+            boxShadow: '0 4px 12px rgba(46, 125, 50, 0.2)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          {loading ? 'Creating Account...' : 'Create Account'}
+        </Button>
 
-          <TextField
-            label="Confirm Password"
-            name="confirmPassword"
-            type="password"
-            fullWidth
-            margin="normal"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-            InputProps={{ style: { color: '#fff' } }}
-            sx={{ 
-              input: { color: '#ffffff' },
-              label: { color: '#9ca3af' },
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: '#3b82f6' },
-                '&:hover fieldset': { borderColor: '#60a5fa' },
-                '&.Mui-focused fieldset': { borderColor: '#93c5fd' }
-              }
-            }}
-          />
-
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            disabled={loading}
-            sx={{ 
-              mt: 3, 
-              p: 1.5,
-              fontSize: '1rem',
-              background: 'linear-gradient(45deg, #2563eb, #9333ea)',
-              '&:hover': { background: 'linear-gradient(45deg, #1d4ed8, #7e22ce)' }
-            }}
-          >
-            {loading ? 'Creating Account...' : 'Sign Up'}
-          </Button>
-
-          <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Typography variant="body2" sx={{ color: '#9ca3af' }}>
-              Already have an account?{' '}
-              <Link component={RouterLink} to="/login" sx={{ color: '#3b82f6' }}>
-                Login
-              </Link>
-            </Typography>
-          </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            By signing up, you agree to our{' '}
+            <Button 
+              variant="text" 
+              sx={{ 
+                color: '#4caf50',
+                textTransform: 'none',
+                fontWeight: 600,
+                p: 0,
+                minWidth: 'auto',
+                '&:hover': {
+                  background: 'transparent',
+                  color: '#2e7d32'
+                }
+              }}
+            >
+              Terms of Service
+            </Button>
+            {' '}and{' '}
+            <Button 
+              variant="text" 
+              sx={{ 
+                color: '#4caf50',
+                textTransform: 'none',
+                fontWeight: 600,
+                p: 0,
+                minWidth: 'auto',
+                '&:hover': {
+                  background: 'transparent',
+                  color: '#2e7d32'
+                }
+              }}
+            >
+              Privacy Policy
+            </Button>
+          </Typography>
         </Box>
-      </Paper>
+      </Box>
     </Box>
   );
 };

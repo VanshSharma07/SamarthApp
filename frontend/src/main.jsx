@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { registerSW } from 'virtual:pwa-register'
+import { AuthProvider } from './contexts/AuthContext' // Add this import
 
 // Register service worker
 if ('serviceWorker' in navigator) {
@@ -11,6 +12,8 @@ if ('serviceWorker' in navigator) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </React.StrictMode>,
 )
