@@ -304,7 +304,7 @@ const FingerTapping = ({ userId, onComplete }) => {
       }
       
       // Ensure duration is a reasonable value
-      actualDuration = Math.min(60, Math.max(5, actualDuration));
+      actualDuration = Math.min(60, actualDuration);
       
       // Calculate final metrics
       const tapsPerSecond = calculateTapsPerSecond();
