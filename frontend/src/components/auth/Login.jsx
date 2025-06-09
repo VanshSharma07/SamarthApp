@@ -10,8 +10,10 @@ import {
   InputAdornment,
   IconButton
 } from '@mui/material';
-import { Visibility, VisibilityOff, Email, Lock } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Email, Lock, Google as GoogleIcon } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+
+const BACKEND_URL = import.meta.env.VITE_API_URL;
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -55,6 +57,11 @@ const Login = () => {
 
   const handleMouseDownPassword = (event) => {
     event.preventDefault();
+  };
+
+  // Google Sign-In handler
+  const handleGoogleSignIn = () => {
+    window.location.href = `${BACKEND_URL}/api/auth/google`;
   };
 
   return (
@@ -239,6 +246,32 @@ const Login = () => {
             </Button>
           </Typography>
         </Box>
+      </Box>
+
+      {/* Google Sign-In Button */}
+      <Box sx={{ textAlign: 'center', mt: 2 }}>
+        <Button
+          variant="outlined"
+          fullWidth
+          startIcon={<GoogleIcon sx={{ color: '#ea4335' }} />}
+          onClick={handleGoogleSignIn}
+          sx={{
+            borderColor: '#c8e6c9',
+            color: '#2e7d32',
+            fontWeight: 600,
+            borderRadius: 2,
+            textTransform: 'none',
+            background: '#fff',
+            '&:hover': {
+              background: '#f5f5f5',
+              borderColor: '#4caf50',
+              color: '#388e3c'
+            },
+            mt: 2
+          }}
+        >
+          Sign in with Google
+        </Button>
       </Box>
     </Box>
   );

@@ -44,12 +44,13 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/analyze': {
-        target: 'https://samarth-backend-233596067763.us-central1.run.app/',
+        target: 'https://samarth-backend-233596067763.us-central1.run.app',
         changeOrigin: true,
         secure: false,
         ws: true
       }
-    }
+    },
+    historyApiFallback: true
   },
   build: {
     chunkSizeWarningLimit: 2000, // Avoid warnings for large chunks

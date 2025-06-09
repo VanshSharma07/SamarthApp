@@ -9,6 +9,7 @@ import { CircularProgress, Box } from '@mui/material';
 import Login from './components/auth/Login';
 import Register from './components/auth/Signup';
 import AuthPage from './components/auth/AuthPage'; // Import AuthPage
+import GoogleAuthHandler from './components/auth/GoogleAuthHandler';
 
 // Pages and components
 import Dashboard from './components/Dashboard';
@@ -76,7 +77,8 @@ function App() {
             {/* Public Auth Routes */}
             <Route path="/login" element={<AuthPage />} />
             <Route path="/signup" element={<AuthPage />} />
-
+            {/* Google OAuth Success Handler */}
+            <Route path="/auth/google/success" element={<GoogleAuthHandler />} />
             {/* Root redirect: If not authenticated, go to /login */}
             <Route path="/" element={<Navigate to="/login" replace />} />
 

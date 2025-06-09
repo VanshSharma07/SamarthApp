@@ -16,9 +16,12 @@ import {
   Email, 
   Lock, 
   Person,
-  PersonOutline 
+  PersonOutline,
+  Google as GoogleIcon 
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+
+const BACKEND_URL = import.meta.env.VITE_API_URL;
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -82,6 +85,11 @@ const Signup = () => {
 
   const handleMouseDownPassword = (event) => {
     event.preventDefault();
+  };
+
+  // Google Sign-Up handler
+  const handleGoogleSignIn = () => {
+    window.location.href = `${BACKEND_URL}/api/auth/google`;
   };
 
   return (
@@ -369,6 +377,32 @@ const Signup = () => {
         >
           {loading ? 'Creating Account...' : 'Create Account'}
         </Button>
+
+        {/* Google Sign-Up Button */}
+        <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Button
+            variant="outlined"
+            fullWidth
+            startIcon={<GoogleIcon sx={{ color: '#ea4335' }} />}
+            onClick={handleGoogleSignIn}
+            sx={{
+              borderColor: '#c8e6c9',
+              color: '#2e7d32',
+              fontWeight: 600,
+              borderRadius: 2,
+              textTransform: 'none',
+              background: '#fff',
+              '&:hover': {
+                background: '#f5f5f5',
+                borderColor: '#4caf50',
+                color: '#388e3c'
+              },
+              mt: 2
+            }}
+          >
+            Sign up with Google
+          </Button>
+        </Box>
 
         <Box sx={{ textAlign: 'center' }}>
           <Typography variant="body2" sx={{ color: '#666' }}>
