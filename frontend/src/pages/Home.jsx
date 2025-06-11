@@ -128,7 +128,7 @@ const Home = () => {
               title="Therapies"
               subtitle="View available treatments"
               icon={LocalHospital}
-              onPress={() => navigate('/therapies')}
+              onPress={() => navigate('/therapy')}
             />
           </Grid>
         </Grid>

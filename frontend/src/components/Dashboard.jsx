@@ -90,7 +90,7 @@ const Dashboard = () => {
       value: '3',
       subtitle: 'Available treatments',
       icon: LocalHospital,
-      route: '/therapies',
+      route: '/therapy',
       color: '#9C27B0'
     },
     {
@@ -697,7 +697,7 @@ const Dashboard = () => {
                       textTransform: 'none',
                       fontWeight: 500
                     }}
-                    onClick={() => navigate('/therapies')}
+                    onClick={() => navigate('/therapy')}
                   >
                     View Exercise
                   </Button>

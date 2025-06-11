@@ -115,7 +115,7 @@ const Layout = ({ children }) => {
     if (path.includes('/dashboard')) return 'dashboard';
     if (path.includes('/assessment')) return 'assessments';
     if (path.includes('/analytics')) return 'analytics';
-    if (path.includes('/therapies')) return 'therapies';
+    if (path.includes('/therapy')) return 'therapies';
     if (path.includes('/settings')) return 'settings';
     if (path.includes('/diagnostics')) return 'diagnostics';
     if (path.includes('/profile')) return 'profile';
@@ -128,7 +128,7 @@ const Layout = ({ children }) => {
     { id: 'dashboard', text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { id: 'assessments', text: 'Assessments', icon: <Assessment />, path: '/assessment' },
     { id: 'analytics', text: 'Analytics', icon: <Analytics />, path: '/analytics' },
-    { id: 'therapies', text: 'Therapies', icon: <HealingIcon />, path: '/therapies' },
+    { id: 'therapies', text: 'Therapies', icon: <HealingIcon />, path: '/therapy' },
     { id: 'settings', text: 'Settings', icon: <Settings />, path: '/settings' },
   ];
 

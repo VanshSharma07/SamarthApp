@@ -20,28 +20,7 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import Diagnostics from './pages/Diagnostics';
 import ProtectedRoute from './components/routing/ProtectedRoute';
-import Therapies from './pages/Therapies';
-import TherapyDetail from './components/therapies/TherapyDetail';
-
-// Therapy pages
-import ParkinsonsTherapy from './pages/therapies/ParkinsonsTherapy';
-import BellsPalsyTherapy from './pages/therapies/BellsPalsyTherapy';
-import ALSTherapy from './pages/therapies/ALSTherapy';
-
-// Parkinsons therapy types
-import ParkinsonsPhysicalTherapy from './pages/therapies/parkinsons/PhysicalTherapy';
-import ParkinsonsSpeechTherapy from './pages/therapies/parkinsons/SpeechTherapy';
-import ParkinsonsOccupationalTherapy from './pages/therapies/parkinsons/OccupationalTherapy';
-
-// Bell's Palsy therapy types
-import BellsPalsyPhysicalTherapy from './pages/therapies/bells-palsy/PhysicalTherapy';
-import BellsPalsySpeechTherapy from './pages/therapies/bells-palsy/SpeechTherapy';
-import BellsPalsyOccupationalTherapy from './pages/therapies/bells-palsy/OccupationalTherapy';
-
-// ALS therapy types
-import ALSPhysicalTherapy from './pages/therapies/als/PhysicalTherapy';
-import ALSSpeechTherapy from './pages/therapies/als/SpeechTherapy';
-import ALSOccupationalTherapy from './pages/therapies/als/OccupationalTherapy';
+import AboutPage from './pages/AboutSamarth';
 
 // Assessment Components
 import EyeMovement from './components/assessments/EyeMovement/EyeMovementTest';
@@ -51,11 +30,22 @@ import Tremor from './components/assessments/Tremor';
 import ResponseTime from './components/assessments/ResponseTime';
 import GaitAnalysis from './components/assessments/GaitAnalysis';
 import FingerTapping from './components/assessments/FingerTapping';
+import TherapyHome from './therapies/TherapyHome'; // Import TherapyHome
+import BellsPalsyTherapy from './therapies/BellsPalsyTherapy'; // Import dedicated therapy modules
+import ALSTherapy from './therapies/ALSTherapy';
+import ParkinsonsTherapy from './therapies/parkinsons/ParkinsonsTherapy';
+import GaitBalanceExercise from './therapies/parkinsons/GaitBalanceExercise';
+import FingerTappingTest from './therapies/parkinsons/FingerTappingTest';
+import FacialExercise from './therapies/parkinsons/FacialExercise';
+// Import Bell's Palsy exercise components
+import FacialMovementExercise from './therapies/bells/FacialMovementExercise';
+// Import ALS exercise components
+import HandRangeExercise from './therapies/als/HandRangeExercise';
+import UpperLimbExercise from './therapies/als/UpperLimbExercise';
 
 // Import AuthProvider and ThemeProvider
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import AboutPage from './pages/AboutSamarth';
 
 function App() {
   const { loading } = useAuth();
@@ -99,32 +89,22 @@ function App() {
             <Route path="/assessment/response-time" element={<ProtectedRoute><ResponseTime /></ProtectedRoute>} />
             <Route path="/assessment/gait-analysis" element={<ProtectedRoute><GaitAnalysis /></ProtectedRoute>} />
             <Route path="/assessment/finger-tapping" element={<ProtectedRoute><FingerTapping /></ProtectedRoute>} />
-            
-            {/* Main therapy routes */}
-            <Route path="/therapies" element={<ProtectedRoute><Therapies /></ProtectedRoute>} />
-            
-            {/* Condition-specific therapy routes */}
-            <Route path="/therapies/parkinsons" element={<ProtectedRoute><ParkinsonsTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/bells-palsy" element={<ProtectedRoute><BellsPalsyTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/als" element={<ProtectedRoute><ALSTherapy /></ProtectedRoute>} />
-            
-            {/* Parkinsons therapy types */}
-            <Route path="/therapies/parkinsons/physical" element={<ProtectedRoute><ParkinsonsPhysicalTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/parkinsons/speech" element={<ProtectedRoute><ParkinsonsSpeechTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/parkinsons/occupational" element={<ProtectedRoute><ParkinsonsOccupationalTherapy /></ProtectedRoute>} />
-            
-            {/* Bell's Palsy therapy types */}
-            <Route path="/therapies/bells-palsy/physical" element={<ProtectedRoute><BellsPalsyPhysicalTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/bells-palsy/speech" element={<ProtectedRoute><BellsPalsySpeechTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/bells-palsy/occupational" element={<ProtectedRoute><BellsPalsyOccupationalTherapy /></ProtectedRoute>} />
-            
-            {/* ALS therapy types */}
-            <Route path="/therapies/als/physical" element={<ProtectedRoute><ALSPhysicalTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/als/speech" element={<ProtectedRoute><ALSSpeechTherapy /></ProtectedRoute>} />
-            <Route path="/therapies/als/occupational" element={<ProtectedRoute><ALSOccupationalTherapy /></ProtectedRoute>} />
-            
-            {/* Generic therapy detail route */}
-            <Route path="/therapies/:condition/:type" element={<ProtectedRoute><TherapyDetail /></ProtectedRoute>} />
+
+            {/* Therapy Module Route */}
+            <Route path="/therapy" element={<ProtectedRoute><TherapyHome /></ProtectedRoute>} />
+            <Route path="/therapy/bells" element={<ProtectedRoute><BellsPalsyTherapy /></ProtectedRoute>} />
+            <Route path="/therapy/als" element={<ProtectedRoute><ALSTherapy /></ProtectedRoute>} />
+            <Route path="/therapy/parkinsons" element={<ProtectedRoute><ParkinsonsTherapy /></ProtectedRoute>} />
+            {/* Parkinson's individual exercise routes */}
+            <Route path="/therapy/parkinsons/gait-balance" element={<ProtectedRoute><GaitBalanceExercise /></ProtectedRoute>} />
+            <Route path="/therapy/parkinsons/tremor-drill" element={<ProtectedRoute><FingerTappingTest /></ProtectedRoute>} />
+            <Route path="/therapy/parkinsons/facial-exercise" element={<ProtectedRoute><FacialExercise /></ProtectedRoute>} />
+            {/* Bell's Palsy exercise routes */}
+            <Route path="/therapy/bells/facial-movement" element={<ProtectedRoute><FacialMovementExercise /></ProtectedRoute>} />
+            {/* ALS exercise routes */}
+            <Route path="/therapy/als/hand-range" element={<ProtectedRoute><HandRangeExercise /></ProtectedRoute>} />
+            <Route path="/therapy/als/upper-limb" element={<ProtectedRoute><UpperLimbExercise /></ProtectedRoute>} />
+            <Route path="/therapy/:disorder" element={<ProtectedRoute><TherapyHome /></ProtectedRoute>} />
             
             {/* Catch all unmatched routes */}
             <Route path="*" element={<NotFound />} />
