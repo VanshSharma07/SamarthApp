@@ -330,7 +330,7 @@ export const analyzeSpeech = () => {
 // Initialize TensorFlow
 initTensorFlow().catch(console.error);
 
-const CENTRALIZED_ML_SERVICE_URL = "https://samarth-ml-service-439314052903.us-central1.run.app/";
+const CENTRALIZED_ML_SERVICE_URL = "http://localhost:8000";
 
 export const MLService = {
   BASE_URL: CENTRALIZED_ML_SERVICE_URL,

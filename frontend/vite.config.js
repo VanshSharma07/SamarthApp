@@ -44,7 +44,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/analyze': {
-        target: 'https://samarth-backend-233596067763.us-central1.run.app',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
         ws: true
