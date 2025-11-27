@@ -40,6 +40,7 @@ import {
   Close as CloseIcon,
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
+import { Info as InfoIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -115,7 +116,8 @@ const Layout = ({ children }) => {
     if (path.includes('/dashboard')) return 'dashboard';
     if (path.includes('/assessment')) return 'assessments';
     if (path.includes('/analytics')) return 'analytics';
-    if (path.includes('/therapy')) return 'therapies';
+      if (path.includes('/therapy')) return 'therapies';
+      if (path.includes('/about')) return 'about';
     if (path.includes('/settings')) return 'settings';
     if (path.includes('/diagnostics')) return 'diagnostics';
     if (path.includes('/profile')) return 'profile';
@@ -126,9 +128,9 @@ const Layout = ({ children }) => {
 
   const menuItems = [
     { id: 'dashboard', text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { id: 'assessments', text: 'Assessments', icon: <Assessment />, path: '/assessment' },
-    { id: 'analytics', text: 'Analytics', icon: <Analytics />, path: '/analytics' },
-    { id: 'therapies', text: 'Therapies', icon: <HealingIcon />, path: '/therapy' },
+    { id: 'assessments', text: 'Select Disorder', icon: <Assessment />, path: '/select-disorder' },
+    { id: 'analytics', text: 'Reports', icon: <Analytics />, path: '/analytics' },
+    { id: 'about', text: 'About Samarth', icon: <InfoIcon />, path: '/about' },
     { id: 'settings', text: 'Settings', icon: <Settings />, path: '/settings' },
   ];
 

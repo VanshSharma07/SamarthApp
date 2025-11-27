@@ -21,11 +21,12 @@ import NotFound from './pages/NotFound';
 import Diagnostics from './pages/Diagnostics';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import AboutPage from './pages/AboutSamarth';
+import SelectDisorder from './pages/SelectDisorder';
+import NeuroAssessment from './pages/NeuroAssessment';
 
 // Assessment Components
 import EyeMovement from './components/assessments/EyeMovement/EyeMovementTest';
 import NeckMobility from './components/assessments/NeckMobility';
-import FacialSymmetry from './components/assessments/FacialSymmetry';
 import Tremor from './components/assessments/Tremor';
 import ResponseTime from './components/assessments/ResponseTime';
 import GaitAnalysis from './components/assessments/GaitAnalysis';
@@ -77,6 +78,7 @@ function App() {
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/assessment" element={<ProtectedRoute><Assessment /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+            <Route path="/select-disorder" element={<ProtectedRoute><SelectDisorder /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/diagnostics" element={<ProtectedRoute><Diagnostics /></ProtectedRoute>} />
             <Route path="/about" element={<ProtectedRoute><AboutPage/></ProtectedRoute>} />
@@ -84,7 +86,8 @@ function App() {
             {/* Assessment Routes */}
             <Route path="/assessment/eye-movement" element={<ProtectedRoute><EyeMovement /></ProtectedRoute>} />
             <Route path="/assessment/neck-mobility" element={<ProtectedRoute><NeckMobility /></ProtectedRoute>} />
-            <Route path="/assessment/facial-symmetry" element={<ProtectedRoute><FacialSymmetry /></ProtectedRoute>} />
+            <Route path="/assessment/neuro" element={<ProtectedRoute><NeuroAssessment /></ProtectedRoute>} />
+            {/* Facial Symmetry assessment removed from app routes */}
             <Route path="/assessment/tremor" element={<ProtectedRoute><Tremor /></ProtectedRoute>} />
             <Route path="/assessment/response-time" element={<ProtectedRoute><ResponseTime /></ProtectedRoute>} />
             <Route path="/assessment/gait-analysis" element={<ProtectedRoute><GaitAnalysis /></ProtectedRoute>} />

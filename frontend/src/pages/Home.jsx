@@ -1,5 +1,5 @@
 import { Box, Typography, Card, CardContent, Grid } from '@mui/material';
-import { Assessment, Analytics, Settings, LocalHospital } from '@mui/icons-material';
+import { Assessment, Analytics, Info } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 
@@ -101,34 +101,26 @@ const Home = () => {
         <Grid container spacing={3}>
           <Grid item xs={12} md={4}>
             <NavigationCard
-              title="Start Assessment"
-              subtitle="Begin your health evaluation"
+              title="Select Disorder"
+              subtitle="Choose an assessment type"
               icon={Assessment}
-              onPress={() => navigate('/assessment')}
+              onPress={() => navigate('/select-disorder')}
             />
           </Grid>
           <Grid item xs={12} md={4}>
             <NavigationCard
-              title="View Analytics"
-              subtitle="Track your progress"
+              title="Reports"
+              subtitle="View your assessment reports"
               icon={Analytics}
               onPress={() => navigate('/analytics')}
             />
           </Grid>
           <Grid item xs={12} md={4}>
             <NavigationCard
-              title="Settings"
-              subtitle="Customize your experience"
-              icon={Settings}
-              onPress={() => navigate('/settings')}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <NavigationCard
-              title="Therapies"
-              subtitle="View available treatments"
-              icon={LocalHospital}
-              onPress={() => navigate('/therapy')}
+              title="About Samarth"
+              subtitle="Learn about this project"
+              icon={Info}
+              onPress={() => navigate('/about')}
             />
           </Grid>
         </Grid>

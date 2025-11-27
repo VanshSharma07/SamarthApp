@@ -2,17 +2,30 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import expressWs from 'express-ws';
 import userRoutes from './routes/user.js';
+import { registerNeuroWs, registerDeviceWs } from './routes/neuroAssessment.js';
 import assessmentRoutes from './routes/assessmentRoutes.js';
 import specializedAssessmentRoutes from './routes/specialized-assessments.js';
 import authRoutes from './routes/auth.js';
 import diagnosticRoutes from './routes/diagnosticRoutes.js';
+import apiRoutes from './routes/api.js';
 import { requestLogger } from './middleware/requestLogger.js';
+import { startSimulator } from './services/neuroSimulator.js';
+// Wordlist processing now runs in-process via `services/wordlistWorker.js`
 
 // Initialize environment variables
 dotenv.config();
 
 const app = express();
+
+// attach express-ws so routers can define websocket endpoints (keeps integration minimal)
+expressWs(app);
+
+// Register neuro WS route now that express-ws has been attached
+registerNeuroWs(app);
+// Register device WS route so ESP32 devices can stream directly
+registerDeviceWs(app);
 
 // Middleware
 app.use(cors({
@@ -36,6 +49,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/specialized-assessments', specializedAssessmentRoutes);
+// Mount the central API routes (tests, specialized endpoints)
+app.use('/api', apiRoutes);
+// Diagnostic routes (keep after main API routes)
 app.use('/api', diagnosticRoutes);
 
 // 404 Middleware (Handles unknown routes)
@@ -54,6 +70,10 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/samarth")
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      // Optionally start the neuro data simulator for demos
+      if (process.env.NEURO_SIMULATOR === 'true') {
+        startSimulator();
+      }
     });
   })
   .catch((error) => {

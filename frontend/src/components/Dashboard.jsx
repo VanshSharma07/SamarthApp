@@ -22,13 +22,13 @@ import {
   Person, 
   Settings,
   Analytics,
-  TrendingUp,
   Speed,
   Assignment,
   LocalHospital,
   CheckCircle as CheckCircleIcon,
   ArrowForward as ArrowForwardIcon,
-  Info as InfoIcon // Add this new import for the About icon
+  Info as InfoIcon,
+  AccessibilityNew
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,30 +68,21 @@ const Dashboard = () => {
   const featureCards = [
     {
       id: 'assessments',
-      title: 'Assessments',
+      title: 'Select Disorder',
       value: '8',
       subtitle: 'Total evaluations',
-      icon: Assessment,
-      route: '/assessment',
+      icon: AccessibilityNew,
+      route: '/select-disorder',
       color: '#FF9F43'
     },
     {
       id: 'progress',
-      title: 'Progress',
+      title: 'Reports',
       value: '75%',
       subtitle: 'Monthly improvement',
-      icon: TrendingUp,
+      icon: Analytics,
       route: '/analytics',
       color: '#4CAF50'
-    },
-    {
-      id: 'therapies',
-      title: 'Therapies',
-      value: '3',
-      subtitle: 'Available treatments',
-      icon: LocalHospital,
-      route: '/therapy',
-      color: '#9C27B0'
     },
     {
       id: 'aboutSamarth',
@@ -110,7 +101,7 @@ const Dashboard = () => {
       id: 'newAssessment',
       title: 'Start New Assessment',
       icon: Assessment,
-      route: '/assessment',
+      route: '/select-disorder',
       color: '#FF6B6B',
       gradientEnd: '#FF8E8E',
       hoverStart: '#FF5252',
@@ -236,7 +227,7 @@ const Dashboard = () => {
               <Button 
                 variant="contained" 
                 endIcon={<ArrowForwardIcon />}
-                onClick={() => navigate('/assessment')}
+                onClick={() => navigate('/select-disorder')}
                 sx={{
                   borderRadius: 8,
                   px: 3,
@@ -305,7 +296,7 @@ const Dashboard = () => {
           
           <Grid container spacing={3}>
             {featureCards.map((card, index) => (
-              <Grid item xs={12} sm={6} md={3} key={card.id}>
+              <Grid item xs={12} sm={6} md={4} key={card.id}>
                 <MotionCard 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}

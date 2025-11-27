@@ -2,11 +2,11 @@ import express from 'express';
 import { eyeMovementController } from '../controllers/eyeMovementController.js';
 import { neckMobilityController } from '../controllers/neckMobilityController.js';
 import { sendReportEmail } from '../controllers/emailController.js';
-// ...existing imports...
+import { startTest, uploadArtifact, completeTest, getResults, getMulterForTest, scheduleDelayedRecall, getInsights } from '../controllers/testsController.js';
+import { auth } from '../middleware/auth.js';
+import neuroRoutes from './neuroAssessment.js';
 
 const router = express.Router();
-
-// ...existing routes...
 
 // Eye Movement routes
 router.post('/specialized-assessments/eye-movement', eyeMovementController.save);
@@ -20,6 +20,24 @@ router.get('/specialized-assessments/neck-mobility/baseline/:userId', neckMobili
 
 router.post('/email/send-report', sendReportEmail);
 
-// ...other routes...
+// Tests (word list) routes
+router.post('/tests/start', auth, express.json(), startTest);
+
+// artifact upload - we need multer per test id
+router.post('/tests/:testId/artifact', auth, (req, res, next) => {
+	const upload = getMulterForTest(req.params.testId).single('file');
+	upload(req, res, (err) => {
+		if (err) return res.status(500).json({ error: err.message });
+		next();
+	});
+}, uploadArtifact);
+
+router.post('/tests/:test_id/complete', auth, completeTest);
+router.get('/tests/:test_id/results', auth, getResults);
+router.get('/tests/:test_id/insights', auth, getInsights);
+router.post('/tests/:testId/schedule-delayed', auth, express.json(), scheduleDelayedRecall);
+
+// Neuro-Assessment routes (EEG/ECG streaming and session APIs)
+router.use('/', neuroRoutes);
 
 export default router;

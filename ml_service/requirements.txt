@@ -11,3 +11,4 @@ soundfile==0.12.1
 audioread==3.0.1
 python-dotenv  # For environment variable management
 aiofiles  # For async file operations, which could help with video handling
+# No server-side ASR package required when using Web Speech API from the browser

@@ -1,4 +1,6 @@
 from fastapi import FastAPI, UploadFile, HTTPException, Form, File
+from typing import List, Optional
+import json
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi import Request
@@ -11,6 +13,7 @@ import io
 import tempfile
 import os
 import uvicorn
+import re
 
 from .models.face_analysis import FaceAnalyzer
 from .models.eye_tracking import EyeTracker
@@ -419,6 +422,199 @@ async def analyze_speech(file: UploadFile = File(...)):
                 os.unlink(temp_path)
             except Exception as e:
                 logger.error(f"Error cleaning up temp file: {str(e)}")
+
+
+@app.post("/extract/wordlist")
+async def extract_wordlist(files: List[UploadFile] = File(None), payload: str = Form(...), file_map: Optional[str] = Form(None)):
+    """
+    Extract wordlist metrics from provided trials and uploaded artifact files.
+    Expects multipart/form-data with:
+      - payload: JSON string with keys: test_id, user_id, words (list), trials (list), delayed (object), metadata
+      - files: optional uploaded audio/video files
+      - file_map: optional JSON mapping uploaded filename -> { type, trialNumber, responseText }
+    Returns metrics and simple z-scores.
+    """
+    temp_files = []
+    try:
+        body = json.loads(payload)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid payload JSON: {str(e)}")
+
+    try:
+        fmap = json.loads(file_map) if file_map else {}
+    except:
+        fmap = {}
+
+    try:
+        # Save uploaded files to temp and associate metadata
+        uploaded_map = {}
+        if files:
+            for f in files:
+                try:
+                    contents = await f.read()
+                    suffix = os.path.splitext(f.filename)[1] or '.webm'
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                        tmp.write(contents)
+                        tmp_path = tmp.name
+                    temp_files.append(tmp_path)
+                    meta = fmap.get(f.filename, {})
+                    uploaded_map[f.filename] = { 'path': tmp_path, 'meta': meta }
+                except Exception as e:
+                    logger.error(f"Failed to save uploaded file {f.filename}: {str(e)}", exc_info=True)
+
+        # Attempt ASR for audio files that don't have responseText using available transcriber
+        # Prefer speech_analyzer.transcribe if available, otherwise try whisper if installed
+        for fname, info in list(uploaded_map.items()):
+            meta = info.get('meta', {}) or {}
+            fpath = info.get('path')
+            if not fpath:
+                continue
+            # Consider audio types
+            if meta.get('type') == 'audio' or fname.lower().endswith(('.wav', '.webm', '.mp3', '.m4a')):
+                # Prefer transcripts provided by the client (Web Speech API) in the meta.
+                # If not provided, we will attempt a light-weight transcription if the
+                # `speech_analyzer.transcribe` helper exists (optional on the ML host).
+                # We intentionally avoid bundling heavy ASR dependencies here; clients
+                # should supply transcripts via the browser's Web Speech API when possible.
+                for fname, info in list(uploaded_map.items()):
+                    meta = info.get('meta', {}) or {}
+                    fpath = info.get('path')
+                    if not fpath:
+                        continue
+                    if meta.get('type') == 'audio' or fname.lower().endswith(('.wav', '.webm', '.mp3', '.m4a')):
+                        # If the client already provided a transcript, prefer it.
+                        if meta.get('responseText'):
+                            logger.info(f"Using client-provided transcript for {fname}")
+                            continue
+
+                        # Optional server-side transcription (best-effort, may not be available)
+                        try:
+                            if hasattr(speech_analyzer, 'transcribe'):
+                                transcript = speech_analyzer.transcribe(fpath)
+                                if transcript:
+                                    uploaded_map[fname]['meta'] = { **meta, 'responseText': transcript }
+                                    logger.info(f"speech_analyzer transcribed {fname}: {transcript}")
+                        except Exception as e:
+                            logger.warning(f"speech_analyzer.transcribe failed for {fname}: {e}")
+
+        # Build responses per trial combining text responses and any uploaded file meta that include responseText
+        words = set([w.lower() for w in body.get('words', [])])
+        trials = body.get('trials', []) or []
+        delayed = body.get('delayed', {}) or {}
+
+        # Tokenize and count words in responses. Many clients send multi-word
+        # transcripts per response (e.g. "apple chair table"). Previously the
+        # code compared the whole response string against the word list which
+        # caused multi-word strings to be treated as intrusions. We now split
+        # responses into tokens and match each token independently.
+        token_re = re.compile(r"[A-Za-z\u00C0-\u017F]+")
+        def count_correct(responses):
+            correct = 0
+            intrusions = 0
+            for r in responses:
+                txt = None
+                if isinstance(r, dict) and r.get('text'):
+                    txt = str(r.get('text')).strip().lower()
+                elif isinstance(r, str):
+                    txt = r.strip().lower()
+                else:
+                    txt = None
+
+                if not txt:
+                    continue
+
+                # find word-like tokens (letters, unicode letters)
+                tokens = token_re.findall(txt)
+                if not tokens:
+                    continue
+
+                for tok in tokens:
+                    t = tok.lower()
+                    if t in words:
+                        correct += 1
+                    else:
+                        intrusions += 1
+
+            return correct, intrusions
+
+        per_trial_correct = []
+        total_intrusions = 0
+        for t in trials:
+            responses = t.get('responses', [])
+            # incorporate any uploaded file meta for this trial that had responseText
+            trial_num = t.get('trial_number')
+            # include file_map entries matching trialNumber
+            for fname, info in uploaded_map.items():
+                meta = info.get('meta', {})
+                if meta and meta.get('trialNumber') == trial_num:
+                    if meta.get('responseText'):
+                        responses.append({ 'text': meta.get('responseText') })
+
+            c, intr = count_correct(responses)
+            per_trial_correct.append(c)
+            total_intrusions += intr
+
+        immediate_total = sum(per_trial_correct)
+        learning_slope = None
+        if len(per_trial_correct) >= 2:
+            learning_slope = per_trial_correct[-1] - per_trial_correct[0]
+
+        delayed_correct = 0
+        if delayed.get('responses'):
+            d_c, d_intr = count_correct(delayed.get('responses', []))
+            delayed_correct = d_c
+            total_intrusions += d_intr
+
+        # Simple normative values (placeholder) — replace with real norms later
+        norms = {
+            'immediate_recall_total': {'mean': 9.0, 'sd': 2.0},
+            'delayed_recall_count': {'mean': 4.0, 'sd': 1.5},
+            'learning_slope': {'mean': 1.0, 'sd': 1.0}
+        }
+
+        def compute_z(metric_name, value):
+            n = norms.get(metric_name)
+            if not n or n.get('sd', 0) == 0:
+                return None
+            return (value - n['mean']) / n['sd']
+
+        metrics = {
+            'immediate_recall_total': immediate_total,
+            'per_trial_correct': per_trial_correct,
+            'learning_slope': learning_slope if learning_slope is not None else 0,
+            'delayed_recall_count': delayed_correct,
+            'intrusion_count': total_intrusions
+        }
+
+        z_scores = {
+            'immediate_recall_total': compute_z('immediate_recall_total', immediate_total),
+            'delayed_recall_count': compute_z('delayed_recall_count', delayed_correct),
+            'learning_slope': compute_z('learning_slope', metrics['learning_slope'])
+        }
+
+        flags = {}
+        for k, z in z_scores.items():
+            try:
+                flags[k] = (z is not None and z < -1.5)
+            except:
+                flags[k] = False
+
+        result = {
+            'success': True,
+            'metrics': metrics,
+            'z_scores': z_scores,
+            'flags': flags
+        }
+
+        return JSONResponse(content=convert_numpy_types(result))
+    finally:
+        # cleanup temp files
+        for f in temp_files:
+            try:
+                if os.path.exists(f):
+                    os.unlink(f)
+            except Exception:
+                pass
 
 @app.options("/analyze/speech")
 async def analyze_speech_options():

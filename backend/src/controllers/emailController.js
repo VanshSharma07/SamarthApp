@@ -1,10 +1,12 @@
-const nodemailer = require('nodemailer');
-require('dotenv').config();
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
  * Sends a report email with PDF attachment using Nodemailer
  */
-exports.sendReportEmail = async (req, res) => {
+export const sendReportEmail = async (req, res) => {
   try {
     const { recipientEmail, pdfData, reportType, patientName } = req.body;
     
@@ -67,9 +69,9 @@ exports.sendReportEmail = async (req, res) => {
     
     // Send email
     const info = await transporter.sendMail(mailOptions);
-    
+
     console.log('Email sent: %s', info.messageId);
-    
+
     res.status(200).json({
       success: true,
       message: 'Email sent successfully',

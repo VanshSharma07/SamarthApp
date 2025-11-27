@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Box, 
   Typography, 
@@ -12,6 +12,7 @@ import {
   Container,
   Divider,
   Chip,
+  Button,
   useTheme,
   useMediaQuery
 } from '@mui/material';
@@ -19,7 +20,6 @@ import {
   Lock as LockIcon,
   RemoveRedEye as EyeIcon,
   AccessibilityNew as MobilityIcon,
-  Face as FaceIcon,
   Vibration as TremorIcon,
   Timer as TimerIcon,
   DirectionsWalk as WalkIcon,
@@ -28,7 +28,7 @@ import {
   Mic as MicIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,12 +36,14 @@ import { useAuth } from '../contexts/AuthContext';
 // Import assessment components
 import EyeMovement from '../components/assessments/EyeMovement/EyeMovementTest';
 import NeckMobility from '../components/assessments/NeckMobility';
-import FacialSymmetry from '../components/assessments/FacialSymmetry';
+// Facial Symmetry assessment removed as per minimal screening requirements
 import Tremor from '../components/assessments/Tremor';
 import ResponseTime from '../components/assessments/ResponseTime';
 import GaitAnalysis from '../components/assessments/GaitAnalysis';
 import FingerTapping from '../components/assessments/FingerTapping';
 import SpeechPatternAssessment from '../components/assessments/SpeechPatternAssessment';
+import WordListAssessment from '../components/assessments/WordList/WordListAssessment';
+import NeuroAssessment from './NeuroAssessment';
 
 // Styled Motion components
 const MotionCard = motion(Card);
@@ -52,6 +54,8 @@ const Assessment = () => {
   const [completedAssessments, setCompletedAssessments] = useState([]);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [selectedDisorder, setSelectedDisorder] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -122,15 +126,7 @@ const Assessment = () => {
     //   route: '/assessment/neck-mobility',
     //   color: '#009688' // Teal
     // },
-    {
-      id: 'facialSymmetry',
-      title: 'Facial Symmetry Assessment',
-      description: 'Analyze facial symmetry and muscle balance.',
-      icon: FaceIcon,
-      component: FacialSymmetry,
-      route: '/assessment/facial-symmetry',
-      color: '#ff5722' // Deep Orange
-    },
+    // Facial Symmetry assessment removed (low overall value across disorders)
     {
       id: 'tremor',
       title: 'Tremor Assessment',
@@ -176,7 +172,71 @@ const Assessment = () => {
       route: '/assessment/speech-pattern',
       color: '#ff9800' // Orange
     }
+    ,
+    {
+      id: 'wordList',
+      title: 'Word List Memory Test',
+      description: 'Short-list verbal memory assessment (immediate + delayed recall).',
+      icon: MicIcon,
+      component: WordListAssessment,
+      route: '/assessment/word-list',
+      color: '#8e24aa'
+    }
+    ,
+    {
+      id: 'neuro',
+      title: 'Neuro (EEG/ECG) Assessment',
+      description: 'Real-time EEG + ECG monitoring for epilepsy and seizure-related events.',
+      icon: MicIcon,
+      component: NeuroAssessment,
+      route: '/assessment/neuro',
+      color: '#F57C00'
+    }
   ];
+  // Map disorders to relevant assessment IDs (based on your table)
+  const disorderAssessmentMap = {
+    parkinsons: [
+      'eyeMovement',
+      'tremor',
+      'gaitAnalysis',
+      'responseTime',
+      'fingerTapping',
+      'speechPattern'
+    ],
+    epilepsy: [
+      'eyeMovement',
+      'neuro'
+    ],
+    alzheimers: [
+      'gaitAnalysis',
+      'responseTime',
+      'speechPattern',
+      'wordList'
+    ]
+  };
+
+  // Human-friendly disorder names
+  const disorderInfo = {
+    parkinsons: "Parkinson's",
+    epilepsy: 'Epilepsy',
+    alzheimers: "Alzheimer's"
+  };
+
+  // Parse disorder from query string
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const d = params.get('disorder');
+    if (d) setSelectedDisorder(d.toLowerCase());
+    else setSelectedDisorder(null);
+  }, [location.search]);
+
+  // Filter assessmentTypes based on selected disorder (fall back to full list)
+  const filteredAssessmentTypes = useMemo(() => {
+    if (!selectedDisorder) return assessmentTypes;
+    const allowed = disorderAssessmentMap[selectedDisorder];
+    if (!allowed) return assessmentTypes;
+    return assessmentTypes.filter(a => allowed.includes(a.id));
+  }, [assessmentTypes, selectedDisorder]);
   // Function to check if an assessment is available
   const isAssessmentAvailable = (index) => {
     // Modified for testing: All assessments are available
@@ -226,23 +286,24 @@ const Assessment = () => {
       
       setCompletedAssessments(updatedCompletedAssessments);
       
-      // Check if all assessments are completed
-      if (checkAllAssessmentsCompleted(updatedCompletedAssessments, assessmentTypes)) {
+      // Check if all relevant assessments are completed
+      const relevantTypes = selectedDisorder ? filteredAssessmentTypes : assessmentTypes;
+      if (checkAllAssessmentsCompleted(updatedCompletedAssessments, relevantTypes)) {
         // All assessments completed - reset for next time and navigate to dashboard
         localStorage.setItem(`new_assessment_session_${user.id}`, 'true');
         navigate('/dashboard');
         return;
       }
-      
-      // Find the next assessment that isn't completed yet
-      const currentIndex = assessmentTypes.findIndex(a => a.id === currentAssessment);
+
+      // Find the next assessment that isn't completed yet within the relevant set
+      const currentIndex = relevantTypes.findIndex(a => a.id === currentAssessment);
       const nextIndex = currentIndex + 1;
-      
-      if (nextIndex < assessmentTypes.length) {
-        // Automatically navigate to the next assessment
-        setCurrentAssessment(assessmentTypes[nextIndex].id);
+
+      if (nextIndex < relevantTypes.length) {
+        // Automatically navigate to the next assessment in the filtered list
+        setCurrentAssessment(relevantTypes[nextIndex].id);
       } else {
-        // All assessments completed
+        // All relevant assessments completed
         setCurrentAssessment(null);
       }
     } catch (error) {
@@ -263,6 +324,15 @@ const Assessment = () => {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
+        {/* Selected disorder banner */}
+        {selectedDisorder && (
+          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Chip label={disorderInfo[selectedDisorder] || selectedDisorder} color="primary" />
+            <Button variant="text" onClick={() => navigate('/select-disorder')} sx={{ textTransform: 'none' }}>
+              Change disorder
+            </Button>
+          </Box>
+        )}
         <Paper 
           elevation={3} 
           sx={{ 
@@ -336,9 +406,9 @@ const Assessment = () => {
     );
   };
 
-  // Calculate progress
+  // Calculate progress (based on filtered set)
   const completionPercentage = Math.round(
-    (completedAssessments.length / assessmentTypes.length) * 100
+    (completedAssessments.length / Math.max(1, filteredAssessmentTypes.length)) * 100
   );
 
   const renderAssessmentList = () => (
@@ -422,9 +492,21 @@ const Assessment = () => {
             </Box>
           </Box>
         </Box>
+        {/* Selected disorder banner (shown above the list) */}
+        {selectedDisorder && (
+          <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label={disorderInfo[selectedDisorder] || selectedDisorder} color="primary" />
+              <Typography color="text.secondary">Showing assessments for the selected disorder</Typography>
+            </Box>
+            <Button variant="outlined" size="small" onClick={() => navigate('/select-disorder')} sx={{ textTransform: 'none' }}>
+              Change selection
+            </Button>
+          </Box>
+        )}
         
         <Grid container spacing={3}>
-          {assessmentTypes.map((assessment, index) => {
+          {filteredAssessmentTypes.map((assessment, index) => {
             const isAvailable = isAssessmentAvailable(index);
             const isCompleted = isAssessmentCompleted(assessment.id);
             
