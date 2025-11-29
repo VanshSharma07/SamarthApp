@@ -230,6 +230,17 @@ const Assessment = () => {
     else setSelectedDisorder(null);
   }, [location.search]);
 
+  // If a disorder is specified, require that its questionnaire has been submitted
+  useEffect(() => {
+    if (!selectedDisorder) return;
+    const key = `${selectedDisorder}_questionnaire`;
+    const saved = localStorage.getItem(key);
+    if (!saved) {
+      // Redirect user back to the disorder-specific questionnaire page
+      navigate(`/disorders/${selectedDisorder}`);
+    }
+  }, [selectedDisorder, navigate]);
+
   // Filter assessmentTypes based on selected disorder (fall back to full list)
   const filteredAssessmentTypes = useMemo(() => {
     if (!selectedDisorder) return assessmentTypes;

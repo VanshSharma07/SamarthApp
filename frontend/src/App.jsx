@@ -22,6 +22,11 @@ import Diagnostics from './pages/Diagnostics';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import AboutPage from './pages/AboutSamarth';
 import SelectDisorder from './pages/SelectDisorder';
+import ParkinsonQuestionnaire from './components/disorderQuestion/ParkinsonQuestionnaire';
+import AlzheimerQuestionnaire from './components/disorderQuestion/AlzheimerQuestionnaire';
+import EpilepsyQuestionnaire from './components/disorderQuestion/EpilepsyQuestionnaire';
+// Use the disorder questionnaire component directly from components
+import DisorderQuestionnaire from './components/disorderQuestion/DisorderQuestionnaire';
 import NeuroAssessment from './pages/NeuroAssessment';
 
 // Assessment Components
@@ -77,8 +82,12 @@ function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/assessment" element={<ProtectedRoute><Assessment /></ProtectedRoute>} />
+            <Route path="/questionnaire" element={<ProtectedRoute><DisorderQuestionnaire /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
             <Route path="/select-disorder" element={<ProtectedRoute><SelectDisorder /></ProtectedRoute>} />
+            <Route path="/disorders/parkinsons" element={<ProtectedRoute><ParkinsonQuestionnaire /></ProtectedRoute>} />
+            <Route path="/disorders/alzheimers" element={<ProtectedRoute><AlzheimerQuestionnaire /></ProtectedRoute>} />
+            <Route path="/disorders/epilepsy" element={<ProtectedRoute><EpilepsyQuestionnaire /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/diagnostics" element={<ProtectedRoute><Diagnostics /></ProtectedRoute>} />
             <Route path="/about" element={<ProtectedRoute><AboutPage/></ProtectedRoute>} />
