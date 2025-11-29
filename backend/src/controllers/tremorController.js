@@ -11,7 +11,25 @@ export const tremorController = {
       });
 
       const assessmentData = req.body;
-      
+
+      // Attach raw buffer from device if client didn't include rawData
+      try {
+        const deviceId = assessmentData.deviceId || assessmentData.metrics?.deviceId || req.query.deviceId || null;
+        if (deviceId && !assessmentData.metrics?.rawData) {
+          const raw = await tremorService.getLatestRaw(deviceId);
+          if (raw && raw.samples && raw.samples.length > 0) {
+            assessmentData.metrics = assessmentData.metrics || {};
+            assessmentData.metrics.rawData = {
+              sampleRate: raw.sampleRate,
+              samples: raw.samples
+            };
+            console.log('Attached raw buffer from device to assessmentData.metrics.rawData', { deviceId, sampleCount: raw.samples.length });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to attach raw buffer:', e.message || e);
+      }
+
       // Validate required fields
       if (!assessmentData.userId || !assessmentData.metrics) {
         return res.status(400).json({

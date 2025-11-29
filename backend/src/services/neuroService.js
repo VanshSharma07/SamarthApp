@@ -120,9 +120,13 @@ class NeuroService extends EventEmitter {
     if (!patientId) throw new Error('patientId required');
     if (this.currentSession) throw new Error('Session already running');
 
-    // validate patient exists (non-blocking)
-    const patient = await Patient.findById(patientId).lean().exec();
-    if (!patient) throw new Error('Patient not found');
+    // Attempt to validate patient exists, but don't fail if there is no Patient record
+    try {
+      const patient = await Patient.findById(patientId).lean().exec();
+      if (!patient) console.warn('startSession: patient not found for id', patientId, '- creating session record referencing this id');
+    } catch (e) {
+      console.warn('startSession: patient lookup failed', e?.message || e);
+    }
 
     const sessionDoc = await AssessmentSession.create({ patientId, startTime: new Date() });
     this.currentSession = {

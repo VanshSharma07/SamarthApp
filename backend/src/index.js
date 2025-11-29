@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import expressWs from 'express-ws';
 import userRoutes from './routes/user.js';
 import { registerNeuroWs, registerDeviceWs } from './routes/neuroAssessment.js';
+import neuroRouter from './routes/neuroAssessment.js';
+import tremorRouter, { registerTremorWs } from './routes/tremor.js';
 import assessmentRoutes from './routes/assessmentRoutes.js';
 import specializedAssessmentRoutes from './routes/specialized-assessments.js';
 import authRoutes from './routes/auth.js';
@@ -26,6 +28,13 @@ expressWs(app);
 registerNeuroWs(app);
 // Register device WS route so ESP32 devices can stream directly
 registerDeviceWs(app);
+// Register tremor WS route (smart glove devices + viewers)
+registerTremorWs(app);
+
+// Mount neuro REST routes (provides /api/assessment/start, /api/assessment/stop, etc.)
+app.use('/api/assessment', neuroRouter);
+// Mount tremor REST routes
+app.use('/api/tremor', tremorRouter);
 
 // Middleware
 app.use(cors({

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Tabs, Tab, Container } from '@mui/material';
 import LiveAssessmentScreen from './NeuroAssessment/LiveAssessmentScreen';
 import PatientSessions from './NeuroAssessment/PatientSessions';
@@ -13,6 +14,7 @@ function a11yProps(index) {
 
 const NeuroAssessment = () => {
   const [tab, setTab] = React.useState(0);
+  const navigate = useNavigate();
 
   return (
     <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
@@ -26,7 +28,7 @@ const NeuroAssessment = () => {
 
       <Box sx={{ mt: 3 }}>
         {tab === 0 && <LiveAssessmentScreen />}
-        {tab === 1 && <PatientSessions onOpenReport={() => setTab(2)} />}
+        {tab === 1 && <PatientSessions onOpenReport={(id) => { navigate(`?sessionId=${id}`); setTab(2); }} />}
         {tab === 2 && <SessionReport />}
       </Box>
     </Container>

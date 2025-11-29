@@ -49,6 +49,14 @@ export default defineConfig({
         secure: false,
         ws: true
       }
+      ,
+      // Forward API requests to backend during development
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+        ws: true
+      }
     },
     historyApiFallback: true
   },

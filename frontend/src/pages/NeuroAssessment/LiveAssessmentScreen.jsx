@@ -74,8 +74,31 @@ const LiveAssessmentScreen = () => {
 
   const start = async () => {
     try {
-      // start session via backend
-      await fetch('/api/assessment/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId: user.id }) });
+      // start session via backend and only mark running when successful
+      const resp = await fetch('/api/assessment/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId: user.id }) });
+      const json = await resp.json().catch(() => null);
+      if (!resp.ok || !json || !json.success) {
+        console.error('Failed to start assessment session', json || resp.statusText);
+        // If a session is already running on the server, attempt a graceful stop and retry once
+        if (json && typeof json.message === 'string' && json.message.toLowerCase().includes('session already running')) {
+          try {
+            console.log('Existing session detected on server — attempting to stop it and retry start');
+            await fetch('/api/assessment/stop', { method: 'POST' });
+            // retry start once
+            const resp2 = await fetch('/api/assessment/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId: user.id }) });
+            const json2 = await resp2.json().catch(() => null);
+            if (resp2.ok && json2 && json2.success) {
+              setRunning(true);
+              connectWs();
+              return;
+            }
+            console.error('Retry to start session failed', json2 || resp2.statusText);
+          } catch (e) {
+            console.error('Error while attempting to stop existing session and retry:', e);
+          }
+        }
+        return;
+      }
       setRunning(true);
       connectWs();
     } catch (e) { console.error(e); }

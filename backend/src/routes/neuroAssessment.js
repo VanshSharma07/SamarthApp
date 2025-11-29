@@ -47,6 +47,8 @@ export function registerDeviceWs(app) {
         try {
           // msg may be Buffer or string
           const txt = (typeof msg === 'string') ? msg : msg.toString('utf8');
+          // Debug: log raw device message for troubleshooting
+          console.log('Device message:', txt);
           neuroService.ingestLine(txt, { source: 'device' }).catch(() => {});
         } catch (e) { /* ignore malformed */ }
       });

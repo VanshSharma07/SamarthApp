@@ -49,7 +49,19 @@ const tremorSchema = new mongoose.Schema({
     rawData: {
       frequencies: [Number],
       amplitudes: [Number],
-      timestamps: [Date]
+      timestamps: [Date],
+      // raw sensor samples (optional) - store recent samples for replay/analysis
+      samples: [{
+        timestamp: Number,
+        gx: Number,
+        gy: Number,
+        gz: Number,
+        ax: Number,
+        ay: Number,
+        az: Number,
+        value: Number
+      }],
+      sampleRate: Number
     }
   }
 }, {
