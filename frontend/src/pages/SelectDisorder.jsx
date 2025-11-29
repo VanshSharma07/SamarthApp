@@ -36,8 +36,8 @@ const SelectDisorder = () => {
   const theme = useTheme();
 
   const handleSelect = (id) => {
-    // Navigate to assessment page with disorder query param
-    navigate(`/assessment?disorder=${encodeURIComponent(id)}`);
+    // Navigate directly to the disorder-specific questionnaire page
+    navigate(`/disorders/${encodeURIComponent(id)}`);
   };
 
   return (
