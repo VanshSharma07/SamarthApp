@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Paper, Grid, Chip, LinearProgress, IconButton } from '@mui/material';
+import { Box, Button, Typography, Select, MenuItem, FormControl, InputLabel, Paper, Grid, Chip, LinearProgress, IconButton } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import StopIcon from '@mui/icons-material/Stop';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -8,7 +8,7 @@ import api from '../../../services/api';
 import WordListResults from './WordListResults';
 
 const defaultWords = [
-  'apple','chair','table','penny','dog','window','river','book','shoe','garden'
+  'apple','chair','table','dog','book','shoe'
 ];
 
 export default function WordListAssessment({ userId, onComplete }) {
@@ -17,18 +17,17 @@ export default function WordListAssessment({ userId, onComplete }) {
   const [words, setWords] = useState(defaultWords);
   const [trialCount, setTrialCount] = useState(3);
   const [currentTrial, setCurrentTrial] = useState(0);
-  const [typedResponse, setTypedResponse] = useState('');
+  // manual typing removed — voice-only input
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const recognitionRef = useRef(null);
+  const finalTranscriptRef = useRef('');
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [recognitionTranscript, setRecognitionTranscript] = useState('');
   const [responses, setResponses] = useState({});
   const [studyWord, setStudyWord] = useState('');
-  const [scheduledUntil, setScheduledUntil] = useState(null);
-  const delayedTimerRef = useRef(null);
   const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
@@ -36,7 +35,6 @@ export default function WordListAssessment({ userId, onComplete }) {
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(t => t.stop());
       }
-      if (delayedTimerRef.current) clearTimeout(delayedTimerRef.current);
     };
   }, []);
 
@@ -93,33 +91,42 @@ export default function WordListAssessment({ userId, onComplete }) {
       try {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
-          const rec = new SpeechRecognition();
-          rec.lang = 'en-US';
-          rec.interimResults = true;
-          rec.maxAlternatives = 1;
-          let interim = '';
-          rec.onresult = (ev) => {
-            let finalTranscript = '';
-            interim = '';
-            for (let i = 0; i < ev.results.length; i++) {
-              const res = ev.results[i];
-              if (res.isFinal) {
-                finalTranscript += res[0].transcript;
-              } else {
-                interim += res[0].transcript;
+            const rec = new SpeechRecognition();
+            rec.lang = 'en-US';
+            rec.interimResults = true;
+            rec.maxAlternatives = 1;
+            let interim = '';
+            finalTranscriptRef.current = '';
+            rec.onresult = (ev) => {
+              let finalTranscript = '';
+              interim = '';
+              for (let i = 0; i < ev.results.length; i++) {
+                const res = ev.results[i];
+                if (res.isFinal) {
+                  finalTranscript += res[0].transcript;
+                } else {
+                  interim += res[0].transcript;
+                }
               }
-            }
-            setRecognitionTranscript((prev) => (finalTranscript || interim || prev));
-          };
-          rec.onerror = (e) => {
-            console.warn('SpeechRecognition error', e);
-          };
-          rec.onend = () => {
-            // do nothing; final transcript is already set
-          };
-          recognitionRef.current = rec;
-          try { rec.start(); } catch (e) { /* ignore start errors */ }
-        }
+              if (finalTranscript) {
+                // accumulate final results
+                finalTranscriptRef.current = (finalTranscriptRef.current ? finalTranscriptRef.current + ' ' : '') + finalTranscript;
+                setRecognitionTranscript(finalTranscriptRef.current);
+              } else {
+                // show interim while waiting for final
+                setRecognitionTranscript((prev) => (interim || prev));
+              }
+            };
+            rec.onerror = (e) => {
+              console.warn('SpeechRecognition error', e);
+            };
+            rec.onend = () => {
+              // ensure final transcript is reflected in state when recognition stops
+              if (finalTranscriptRef.current) setRecognitionTranscript(finalTranscriptRef.current);
+            };
+            recognitionRef.current = rec;
+            try { rec.start(); } catch (e) { /* ignore start errors */ }
+          }
       } catch (e) {
         console.warn('SpeechRecognition unavailable', e);
       }
@@ -141,10 +148,14 @@ export default function WordListAssessment({ userId, onComplete }) {
       // Stop SpeechRecognition if running
       try {
         const rec = recognitionRef.current;
-        if (rec) {
-          try { rec.stop(); } catch (e) { /* ignore */ }
-          recognitionRef.current = null;
-        }
+          if (rec) {
+            try { rec.stop(); } catch (e) { /* ignore */ }
+            // give recognition a brief moment to finalize
+            setTimeout(() => {
+              if (finalTranscriptRef.current) setRecognitionTranscript(finalTranscriptRef.current);
+              recognitionRef.current = null;
+            }, 150);
+          }
       } catch (e) {
         console.warn('Error stopping SpeechRecognition', e);
       }
@@ -164,7 +175,14 @@ export default function WordListAssessment({ userId, onComplete }) {
       if (file) form.append('file', file, file.name || `${Date.now()}.webm`);
       form.append('artifactType', artifactType);
       if (trialNumber != null) form.append('trial_number', String(trialNumber));
-      if (responseText != null) form.append('response_text', JSON.stringify(responseText));
+        if (responseText != null) {
+          // send raw string when possible (backend will accept JSON or plain string)
+          if (typeof responseText === 'string') {
+            form.append('response_text', responseText);
+          } else {
+            form.append('response_text', JSON.stringify(responseText));
+          }
+        }
       // Also include a plain transcript field for compatibility with ML endpoint
       if (typeof responseText === 'string' && responseText.trim().length > 0) {
         form.append('transcript', responseText);
@@ -178,77 +196,32 @@ export default function WordListAssessment({ userId, onComplete }) {
 
   const submitTrial = async () => {
     const trialNumber = currentTrial;
-    if (typedResponse && typedResponse.trim().length > 0) {
-      await uploadArtifact({ file: null, artifactType: 'typed', trialNumber, responseText: typedResponse });
-    }
+    // Voice-only input: prefer recognition transcript; if audio recorded upload the file too
+    const transcript = recognitionTranscript || '';
     if (audioBlob) {
       const file = new File([audioBlob], `trial-${trialNumber}.webm`, { type: audioBlob.type });
-      const transcript = typedResponse?.trim() || recognitionTranscript || '';
       await uploadArtifact({ file, artifactType: 'audio', trialNumber, responseText: transcript });
+    } else if (transcript) {
+      // No audio file but have a transcript from the recognizer
+      await uploadArtifact({ file: null, artifactType: 'audio', trialNumber, responseText: transcript });
     }
 
-    setResponses(prev => ({ ...prev, [trialNumber]: { typed: typedResponse, hasAudio: !!audioBlob } }));
-    setTypedResponse('');
+    setResponses(prev => ({ ...prev, [trialNumber]: { hasAudio: !!audioBlob } }));
     setAudioBlob(null);
 
     if (currentTrial < trialCount) {
       setCurrentTrial(currentTrial + 1);
     } else {
+      // finished immediate trials — ask backend to compute and persist results
+      setPhase('completed');
       try {
         await api.post(`/tests/${testId}/complete`);
-        // show results viewer and let it poll for backend scores
+        // show results viewer which will poll for backend scores
         setShowResults(true);
       } catch (err) {
         console.error('complete call failed', err);
+        setShowResults(true);
       }
-      setPhase('completed');
-    }
-  };
-
-  const scheduleDelayedRecall = (minutes = 30) => {
-    const when = Date.now() + minutes * 60000;
-    // Ask backend to schedule delayed recall (reliable even if user closes page)
-    api.post(`/tests/${testId}/schedule-delayed`, { delay_minutes: minutes })
-      .then((r) => {
-        localStorage.setItem(`delayed_recall_${testId}`, String(when));
-        setScheduledUntil(when);
-        setPhase('scheduled');
-      })
-      .catch((err) => {
-        console.warn('Server scheduling failed, falling back to client-side timer', err);
-        localStorage.setItem(`delayed_recall_${testId}`, String(when));
-        setScheduledUntil(when);
-        setPhase('scheduled');
-      });
-    // schedule in-page timer as UX fallback
-    const delay = when - Date.now();
-    if (delay > 0) {
-      delayedTimerRef.current = setTimeout(() => {
-        setPhase('delayed');
-      }, delay);
-    } else {
-      setPhase('delayed');
-    }
-  };
-
-  const doDelayedRecallNow = async () => {
-    if (typedResponse && typedResponse.trim().length > 0) {
-      await uploadArtifact({ file: null, artifactType: 'typed', trialNumber: undefined, responseText: typedResponse });
-    }
-    if (audioBlob) {
-      const file = new File([audioBlob], `delayed-${Date.now()}.webm`, { type: audioBlob.type });
-      const transcript = typedResponse?.trim() || recognitionTranscript || '';
-      await uploadArtifact({ file, artifactType: 'audio', trialNumber: undefined, responseText: transcript });
-    }
-    localStorage.removeItem(`delayed_recall_${testId}`);
-    setScheduledUntil(null);
-    setPhase('done');
-    try {
-      const r = await api.get(`/tests/${testId}/results`);
-      onComplete && onComplete({ testId, results: r.data.data });
-    } catch (err) {
-      console.error('failed to fetch results', err);
-      onComplete && onComplete({ testId });
     }
   };
 
@@ -257,7 +230,7 @@ export default function WordListAssessment({ userId, onComplete }) {
       <Grid container spacing={2} alignItems="center">
         <Grid item xs={12} md={8}>
           <Typography variant="h5" sx={{ fontWeight: 600 }}>Word List Memory Test</Typography>
-          <Typography sx={{ mt: 1, color: 'text.secondary' }}>You will see a short list of words and then be asked to recall them across {trialCount} trials. Use the microphone or type your answers.</Typography>
+          <Typography sx={{ mt: 1, color: 'text.secondary' }}>You will see a short list of words and then be asked to recall them across {trialCount} trials. Use the microphone to speak your answers.</Typography>
         </Grid>
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
@@ -302,15 +275,7 @@ export default function WordListAssessment({ userId, onComplete }) {
         <Chip label={`Trial ${currentTrial}/${trialCount}`} color="secondary" />
       </Box>
 
-      <TextField
-        multiline
-        minRows={4}
-        placeholder="Type the words you recall here, separated by commas or spaces"
-        fullWidth
-        sx={{ mt: 2 }}
-        value={typedResponse}
-        onChange={(e) => setTypedResponse(e.target.value)}
-      />
+      {/* Manual typing removed — voice input only. */}
 
       <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         {!recording ? (
@@ -333,55 +298,26 @@ export default function WordListAssessment({ userId, onComplete }) {
   const renderCompleted = () => (
     <Paper sx={{ p:3 }} elevation={1}>
       <Typography variant="h6">Immediate trials completed</Typography>
-      <Typography sx={{ mt: 1, color: 'text.secondary' }}>Would you like to schedule a delayed recall?</Typography>
+      <Typography sx={{ mt: 1, color: 'text.secondary' }}>Immediate trials are complete — view your results.</Typography>
       <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-        <Button variant="outlined" onClick={() => scheduleDelayedRecall(20)}>Schedule 20 min</Button>
-        <Button variant="outlined" onClick={() => scheduleDelayedRecall(30)}>Schedule 30 min</Button>
-        <Button variant="contained" onClick={() => { setPhase('delayed'); }}>Do delayed recall now</Button>
+        <Button variant="contained" onClick={() => setShowResults(true)}>View Results</Button>
       </Box>
     </Paper>
   );
 
   const renderScheduled = () => (
-    <Box>
-      <Typography variant="h6">Delayed recall scheduled</Typography>
-      <Typography sx={{ mt: 1 }}>We will remind you when it's time to do the delayed recall.</Typography>
-      <Box sx={{ mt: 2 }}>
-        <Button variant="contained" onClick={() => { setPhase('delayed'); }}>Do it now</Button>
-      </Box>
-    </Box>
+    null
   );
 
   const renderDelayed = () => (
-    <Box>
-      <Typography variant="h6">Delayed Recall</Typography>
-      <Typography sx={{ mt: 1 }}>Please recall the words from earlier. Type or record your responses.</Typography>
-      <TextareaAutosize
-        minRows={4}
-        placeholder="Type your recalled words here"
-        style={{ width: '100%', marginTop: 12, padding: 8 }}
-        value={typedResponse}
-        onChange={(e) => setTypedResponse(e.target.value)}
-      />
-      <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-        {!recording ? (
-          <Button startIcon={<MicIcon />} variant="outlined" onClick={startRecording} aria-label="Start delayed recording">Record Audio</Button>
-        ) : (
-          <Button color="error" startIcon={<StopIcon />} variant="contained" onClick={stopRecording} aria-label="Stop delayed recording">Stop</Button>
-        )}
-        {audioUrl && (
-          <Button onClick={playAudio} aria-label="Play delayed recording">Play</Button>
-        )}
-        <Button variant="contained" onClick={doDelayedRecallNow} aria-label="Submit delayed recall">Submit Delayed Recall</Button>
-      </Box>
-    </Box>
+    null
   );
 
   return (
     <Box>
       {showResults && (
         <Box sx={{ mb: 2 }}>
-          <WordListResults testId={testId} onClose={() => setShowResults(false)} />
+          <WordListResults testId={testId} onClose={() => { setShowResults(false); }} />
         </Box>
       )}
       <Grid container spacing={2}>
@@ -406,7 +342,7 @@ export default function WordListAssessment({ userId, onComplete }) {
               <Typography sx={{ mt:1 }}>{currentTrial > 0 ? `Trial ${currentTrial} of ${trialCount}` : 'Not started'}</Typography>
             </Box>
             <Box sx={{ mt:2 }}>
-              <Typography variant="caption">Keep speaking or typing your responses when prompted. The words and transcripts are hidden here to reduce test cueing.</Typography>
+              <Typography variant="caption">Keep speaking your responses when prompted. The words and transcripts are hidden here to reduce test cueing.</Typography>
             </Box>
           </Paper>
         </Grid>

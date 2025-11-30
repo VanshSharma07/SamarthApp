@@ -5,6 +5,7 @@ import { sendReportEmail } from '../controllers/emailController.js';
 import { startTest, uploadArtifact, completeTest, getResults, getMulterForTest, scheduleDelayedRecall, getInsights } from '../controllers/testsController.js';
 import { auth } from '../middleware/auth.js';
 import neuroRoutes from './neuroAssessment.js';
+import disorderQuestionnaireRoutes from './disorderQuestionnaire.js';
 
 const router = express.Router();
 
@@ -39,5 +40,8 @@ router.post('/tests/:testId/schedule-delayed', auth, express.json(), scheduleDel
 
 // Neuro-Assessment routes (EEG/ECG streaming and session APIs)
 router.use('/', neuroRoutes);
+
+// Disorder questionnaire routes
+router.use('/disorders', disorderQuestionnaireRoutes);
 
 export default router;

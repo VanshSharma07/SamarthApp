@@ -35,7 +35,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Import assessment components
 import EyeMovement from '../components/assessments/EyeMovement/EyeMovementTest';
-import NeckMobility from '../components/assessments/NeckMobility';
 // Facial Symmetry assessment removed as per minimal screening requirements
 import Tremor from '../components/assessments/Tremor';
 import ResponseTime from '../components/assessments/ResponseTime';

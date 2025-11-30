@@ -3,7 +3,7 @@ import { Box, Button, Typography, Paper, CircularProgress, Table, TableBody, Tab
 import api from '../../../services/api';
 import WordListInsights from './WordListInsights';
 
-export default function WordListResults({ testId, onClose, autoPoll = true, pollIntervalMs = 3000, pollTimeoutMs = 120000 }) {
+export default function WordListResults({ testId, metrics = null, onClose, autoPoll = true, pollIntervalMs = 3000, pollTimeoutMs = 120000 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [scores, setScores] = useState([]);
@@ -27,6 +27,11 @@ export default function WordListResults({ testId, onClose, autoPoll = true, poll
   };
 
   useEffect(() => {
+    // If metrics are provided by the client, use them directly and skip polling/fetching
+    if (metrics) {
+      setScores(Array.isArray(metrics) ? metrics : []);
+      return;
+    }
     if (!testId) return;
     let cancelled = false;
     let intervalId = null;
@@ -73,16 +78,62 @@ export default function WordListResults({ testId, onClose, autoPoll = true, poll
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testId]);
 
-  if (!testId) return <Typography>Please provide a test ID to view results.</Typography>;
+  if (!testId && !metrics) return <Typography>Please provide a test ID or metrics to view results.</Typography>;
+  const hasZ = scores.some(s => s.zScore !== null && s.zScore !== undefined);
+  const hasDetails = scores.some(s => s.details !== null && s.details !== undefined);
+  const hasFlag = scores.some(s => s.flag !== null && s.flag !== undefined && s.flag !== false);
+  const hasRecorded = scores.some(s => s.createdAt);
+
+  const renderValue = (val, metric) => {
+    if (val === null || val === undefined) return '-';
+    if (Array.isArray(val)) return val.join(', ');
+    if (typeof val === 'object') {
+      // For flags object, render active flags as comma list
+      if (metric === 'flags') {
+        try {
+          const keys = Object.keys(val).filter(k => val[k]);
+          return keys.length ? keys.join(', ') : '-';
+        } catch (e) {
+          return JSON.stringify(val);
+        }
+      }
+      // compact JSON for other objects
+      try { return JSON.stringify(val); } catch (e) { return String(val); }
+    }
+    return String(val);
+  };
+
+  const renderDetails = (details) => {
+    if (!details) return '-';
+    if (Array.isArray(details)) {
+      // Try to render per-trial details compactly
+      const parts = details.map(d => {
+        if (d === null || d === undefined) return '-';
+        if (typeof d === 'object') {
+          const trial = d.trial != null ? `T${d.trial}` : '';
+          if (Array.isArray(d.correctWords)) {
+            return `${trial}: ${d.correctWords.join(', ')}`.trim();
+          }
+          if (d.correctWords) return `${trial}: ${String(d.correctWords)}`.trim();
+          if (d.combinedText) return `${trial}: ${String(d.combinedText).slice(0,60)}`.trim();
+          return JSON.stringify(d);
+        }
+        return String(d);
+      });
+      return <Box component="span">{parts.join(' — ')}</Box>;
+    }
+    if (typeof details === 'object') return <Box component="pre" sx={{ whiteSpace: 'pre-wrap', maxWidth: 400 }}>{JSON.stringify(details, null, 2)}</Box>;
+    return String(details);
+  };
 
   return (
     <Paper sx={{ p: 2 }} elevation={2}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h6">Word List Results</Typography>
-        <Box>
-          <Button onClick={fetchResults} disabled={loading} sx={{ mr: 1 }}>Refresh</Button>
-          {onClose && <Button onClick={onClose}>Close</Button>}
-        </Box>
+          <Box>
+            {!metrics && <Button onClick={fetchResults} disabled={loading} sx={{ mr: 1 }}>Refresh</Button>}
+            {onClose && <Button onClick={onClose}>Close</Button>}
+          </Box>
       </Box>
 
       {loading && (
@@ -101,31 +152,21 @@ export default function WordListResults({ testId, onClose, autoPoll = true, poll
             <TableRow>
               <TableCell>Metric</TableCell>
               <TableCell>Value</TableCell>
-              <TableCell>Details</TableCell>
-              <TableCell>Z-score</TableCell>
-              <TableCell>Flag</TableCell>
-              <TableCell>Recorded</TableCell>
+              {hasDetails && <TableCell>Details</TableCell>}
+              {hasZ && <TableCell>Z-score</TableCell>}
+              {hasFlag && <TableCell>Flag</TableCell>}
+              {hasRecorded && <TableCell>Recorded</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {scores.map((s) => (
               <TableRow key={s._id || `${s.metric}-${s.createdAt}`}>
-                <TableCell sx={{ textTransform: 'capitalize' }}>{s.metric}</TableCell>
-                <TableCell>{s.value !== null && s.value !== undefined ? String(s.value) : '-'}</TableCell>
-                <TableCell>
-                  {s.details ? (
-                    Array.isArray(s.details) ? (
-                      <Box component="span">{s.details.join(', ')}</Box>
-                    ) : typeof s.details === 'object' ? (
-                      <Box component="pre" sx={{ whiteSpace: 'pre-wrap', maxWidth: 400 }}>{JSON.stringify(s.details, null, 2)}</Box>
-                    ) : (
-                      <span>{String(s.details)}</span>
-                    )
-                  ) : ('-')}
-                </TableCell>
-                <TableCell>{s.zScore !== null && s.zScore !== undefined ? Number(s.zScore).toFixed(2) : '-'}</TableCell>
-                <TableCell>{s.flag ? '⚠️' : '-'}</TableCell>
-                <TableCell>{s.createdAt ? new Date(s.createdAt).toLocaleString() : '-'}</TableCell>
+                <TableCell sx={{ textTransform: 'capitalize' }}>{s.metric.replace(/_/g, ' ')}</TableCell>
+                <TableCell>{renderValue(s.value, s.metric)}</TableCell>
+                {hasDetails && <TableCell>{renderDetails(s.details)}</TableCell>}
+                {hasZ && <TableCell>{s.zScore !== null && s.zScore !== undefined ? Number(s.zScore).toFixed(2) : '-'}</TableCell>}
+                {hasFlag && <TableCell>{s.flag ? '⚠️' : '-'}</TableCell>}
+                {hasRecorded && <TableCell>{s.createdAt ? new Date(s.createdAt).toLocaleString() : '-'}</TableCell>}
               </TableRow>
             ))}
           </TableBody>
