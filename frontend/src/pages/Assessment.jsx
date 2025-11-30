@@ -28,6 +28,7 @@ import {
   Mic as MicIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
+import { Psychology as PsychologyIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
@@ -43,6 +44,7 @@ import FingerTapping from '../components/assessments/FingerTapping';
 import SpeechPatternAssessment from '../components/assessments/SpeechPatternAssessment';
 import WordListAssessment from '../components/assessments/WordList/WordListAssessment';
 import NeuroAssessment from './NeuroAssessment';
+import StroopTest from '../components/assessments/AlzehmierStrooptest/StroopTest';
 
 // Styled Motion components
 const MotionCard = motion(Card);
@@ -191,6 +193,16 @@ const Assessment = () => {
       route: '/assessment/neuro',
       color: '#F57C00'
     }
+  ,
+    {
+      id: 'stroop',
+      title: 'Stroop Test',
+      description: 'Assess cognitive interference and processing speed using color-word tasks.',
+      icon: PsychologyIcon,
+      component: StroopTest,
+      route: '/assessment/stroop',
+      color: '#1976d2'
+    }
   ];
   // Map disorders to relevant assessment IDs (based on your table)
   const disorderAssessmentMap = {
@@ -210,7 +222,8 @@ const Assessment = () => {
       'gaitAnalysis',
       'responseTime',
       'speechPattern',
-      'wordList'
+      'wordList',
+      'stroop'
     ]
   };
 
