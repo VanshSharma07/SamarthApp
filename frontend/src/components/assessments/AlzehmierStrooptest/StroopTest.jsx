@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { specializedAssessments } from '../../../services/api';
 import { Box, Typography, Button, Paper, LinearProgress, Stack, Chip, Grid } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CloseIcon from '@mui/icons-material/Close';
@@ -62,6 +63,52 @@ const StroopTest = ({ userId, onComplete }) => {
     setTrial(next);
   };
 
+  const [saveStatus, setSaveStatus] = useState({ saving: false, error: null, success: false });
+
+  // Centralized save + callback so both Skip and Complete use the same flow
+  const completeAssessment = async (payload) => {
+    try {
+      setSaveStatus({ saving: true, error: null, success: false });
+
+      const assessmentData = {
+        userId: payload.userId || userId,
+        type: 'stroop',
+        timestamp: new Date().toISOString(),
+        score: payload.score ?? score,
+        total: payload.total ?? totalTrials,
+        accuracy: payload.accuracy ?? (totalTrials ? (score / totalTrials) : 0),
+        history: payload.history ?? history,
+        rawData: payload.rawData ?? null,
+        status: payload.status || (payload.total === 0 ? 'FAILED' : 'COMPLETED')
+      };
+
+      // Send to backend
+      const response = await specializedAssessments.stroop.save(assessmentData);
+
+      if (!response?.data || !response.data.success) {
+        throw new Error(response?.data?.error || 'Failed to save stroop assessment');
+      }
+
+      setSaveStatus({ saving: false, error: null, success: true });
+
+      // Call parent onComplete with saved data (include server id if available)
+      if (onComplete) {
+        onComplete({
+          ...assessmentData,
+          id: response.data.data?._id || response.data.data?.id
+        });
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error saving stroop assessment:', error);
+      setSaveStatus({ saving: false, error: error.message, success: false });
+      // still call onComplete so parent can handle skip/failure if provided
+      if (onComplete) onComplete(payload);
+      return null;
+    }
+  };
+
   return (
     <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }} elevation={1}>
       <Stack spacing={2}>
@@ -80,7 +127,7 @@ const StroopTest = ({ userId, onComplete }) => {
         {!running && trial === 0 && (
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 1 }}>
             <Button variant="contained" onClick={handleStart} size="large">Start</Button>
-            <Button variant="outlined" onClick={() => { if (onComplete) onComplete({ assessmentType: 'stroop', userId, score: 0, total: 0, accuracy: 0 }); }} size="large">Skip</Button>
+            <Button variant="outlined" onClick={() => completeAssessment({ assessmentType: 'stroop', userId, score: 0, total: 0, accuracy: 0, status: 'FAILED' })} size="large">Skip</Button>
           </Box>
         )}
 
@@ -136,7 +183,7 @@ const StroopTest = ({ userId, onComplete }) => {
             </Grid>
 
             <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-              <Button variant="contained" onClick={() => { if (onComplete) onComplete({ assessmentType: 'stroop', userId, score, total: totalTrials, accuracy: score / totalTrials }); }}>Complete Assessment</Button>
+              <Button variant="contained" onClick={() => completeAssessment({ assessmentType: 'stroop', userId, score, total: totalTrials, accuracy: score / totalTrials, history })} disabled={saveStatus.saving || saveStatus.success}>{saveStatus.saving ? 'Saving...' : saveStatus.success ? 'Assessment Saved' : 'Complete Assessment'}</Button>
               <Button variant="outlined" onClick={handleStart}>Start Assessment</Button>
             </Box>
           </Box>

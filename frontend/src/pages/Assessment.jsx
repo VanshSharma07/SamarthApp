@@ -44,6 +44,7 @@ import FingerTapping from '../components/assessments/FingerTapping';
 import SpeechPatternAssessment from '../components/assessments/SpeechPatternAssessment';
 import WordListAssessment from '../components/assessments/WordList/WordListAssessment';
 import NeuroAssessment from './NeuroAssessment';
+import HyperventilationResponseTest from './Hyperventilation/HyperventilationResponseTest';
 import StroopTest from '../components/assessments/AlzehmierStrooptest/StroopTest';
 
 // Styled Motion components
@@ -195,6 +196,16 @@ const Assessment = () => {
     }
   ,
     {
+      id: 'hyperventilation',
+      title: 'Hyperventilation Response Test',
+      description: 'Provocation protocol: baseline, hyperventilation, recovery with EEG+ECG monitoring.',
+      icon: MicIcon,
+      component: HyperventilationResponseTest,
+      route: '/assessment/hyperventilation',
+      color: '#d32f2f'
+    }
+  ,
+    {
       id: 'stroop',
       title: 'Stroop Test',
       description: 'Assess cognitive interference and processing speed using color-word tasks.',
@@ -216,7 +227,8 @@ const Assessment = () => {
     ],
     epilepsy: [
       'eyeMovement',
-      'neuro'
+      'neuro',
+      'hyperventilation'
     ],
     alzheimers: [
       'gaitAnalysis',

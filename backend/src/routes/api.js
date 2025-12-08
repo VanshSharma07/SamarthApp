@@ -6,6 +6,7 @@ import { startTest, uploadArtifact, completeTest, getResults, getMulterForTest, 
 import { auth } from '../middleware/auth.js';
 import neuroRoutes from './neuroAssessment.js';
 import disorderQuestionnaireRoutes from './disorderQuestionnaire.js';
+import hyperventilationTestRoutes from './hyperventilationTestRoutes.js';
 
 const router = express.Router();
 
@@ -43,5 +44,8 @@ router.use('/', neuroRoutes);
 
 // Disorder questionnaire routes
 router.use('/disorders', disorderQuestionnaireRoutes);
+
+// Hyperventilation test routes (standalone test module)
+router.use('/tests/hyperventilation', hyperventilationTestRoutes);
 
 export default router;

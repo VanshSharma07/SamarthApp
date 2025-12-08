@@ -53,15 +53,16 @@ const tremorSchema = new mongoose.Schema({
       // raw sensor samples (optional) - store recent samples for replay/analysis
       samples: [{
         timestamp: Number,
+        timestamp_us: Number, // microsecond timestamp from ESP32 for medical-grade accuracy
         gx: Number,
         gy: Number,
         gz: Number,
         ax: Number,
         ay: Number,
         az: Number,
-        value: Number
+        value: Number // gyro magnitude or accel magnitude
       }],
-      sampleRate: Number
+      sampleRate: Number // ↑ now 200 Hz from updated ESP32 firmware
     }
   }
 }, {

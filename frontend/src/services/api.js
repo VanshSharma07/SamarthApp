@@ -337,6 +337,24 @@ export const specializedAssessments = {
     getHistory: (userId, limit) => api.get('/specialized-assessments/speech-pattern/history', { params: { userId, limit } }),
     getBaseline: (userId) => api.get(`/specialized-assessments/speech-pattern/baseline/${userId}`)
   }
+  ,
+  stroop: {
+    save: async (data) => {
+      try {
+        const response = await api.post('/specialized-assessments/stroop', data);
+        return response;
+      } catch (error) {
+        console.error('API Error in stroop.save:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message
+        });
+        throw error;
+      }
+    },
+    getHistory: (userId, limit) => api.get('/specialized-assessments/stroop/history', { params: { userId, limit } }),
+    getBaseline: (userId) => api.get(`/specialized-assessments/stroop/baseline/${userId}`)
+  }
 };
 
 export { api };
