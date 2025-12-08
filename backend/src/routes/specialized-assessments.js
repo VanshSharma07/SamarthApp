@@ -7,6 +7,7 @@ import { responseTimeController } from '../controllers/responseTimeController.js
 import { gaitAnalysisController } from '../controllers/gaitAnalysisController.js';
 import { fingerTappingController } from '../controllers/fingerTappingController.js';
 import { speechPatternController } from '../controllers/speechPatternController.js';
+import { stroopController } from '../controllers/stroopController.js';
 
 const router = express.Router();
 
@@ -44,6 +45,11 @@ router.get('/gait-analysis/baseline/:userId', gaitAnalysisController.getBaseline
 router.post('/finger-tapping', fingerTappingController.save);
 router.get('/finger-tapping/history', fingerTappingController.getHistory);
 router.get('/finger-tapping/baseline/:userId', fingerTappingController.getBaseline);
+
+// Stroop Assessment routes
+router.post('/stroop', stroopController.save);
+router.get('/stroop/history', stroopController.getHistory);
+router.get('/stroop/baseline/:userId', stroopController.getBaseline);
 
 // SpeechPattern Assessment routes
 router.post('/speech-pattern', speechPatternController.save);

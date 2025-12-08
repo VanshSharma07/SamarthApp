@@ -28,6 +28,7 @@ import EpilepsyQuestionnaire from './components/disorderQuestion/EpilepsyQuestio
 // Use the disorder questionnaire component directly from components
 import DisorderQuestionnaire from './components/disorderQuestion/DisorderQuestionnaire';
 import NeuroAssessment from './pages/NeuroAssessment';
+import HyperventilationResponseTest from './pages/Hyperventilation/HyperventilationResponseTest';
 
 // Assessment Components
 import EyeMovement from './components/assessments/EyeMovement/EyeMovementTest';
@@ -96,6 +97,7 @@ function App() {
             <Route path="/assessment/eye-movement" element={<ProtectedRoute><EyeMovement /></ProtectedRoute>} />
             <Route path="/assessment/neck-mobility" element={<ProtectedRoute><NeckMobility /></ProtectedRoute>} />
             <Route path="/assessment/neuro" element={<ProtectedRoute><NeuroAssessment /></ProtectedRoute>} />
+            <Route path="/assessment/hyperventilation" element={<ProtectedRoute><HyperventilationResponseTest /></ProtectedRoute>} />
             {/* Facial Symmetry assessment removed from app routes */}
             <Route path="/assessment/tremor" element={<ProtectedRoute><Tremor /></ProtectedRoute>} />
             <Route path="/assessment/response-time" element={<ProtectedRoute><ResponseTime /></ProtectedRoute>} />

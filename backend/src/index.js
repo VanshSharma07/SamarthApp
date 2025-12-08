@@ -7,6 +7,8 @@ import userRoutes from './routes/user.js';
 import { registerNeuroWs, registerDeviceWs } from './routes/neuroAssessment.js';
 import neuroRouter from './routes/neuroAssessment.js';
 import tremorRouter, { registerTremorWs } from './routes/tremor.js';
+import * as hvWs from './controllers/hyperventilationWebSocket.js';
+import neuroService from './services/neuroService.js';
 import assessmentRoutes from './routes/assessmentRoutes.js';
 import specializedAssessmentRoutes from './routes/specialized-assessments.js';
 import authRoutes from './routes/auth.js';
@@ -30,6 +32,26 @@ registerNeuroWs(app);
 registerDeviceWs(app);
 // Register tremor WS route (smart glove devices + viewers)
 registerTremorWs(app);
+
+// Register hyperventilation WS route so HV frontend clients can connect
+if (typeof app.ws === 'function') {
+  app.ws('/tests/hyperventilation/stream', function(ws, req) {
+    try { hvWs.addClient(ws); } catch (e) { console.warn('Failed to add HV WS client', e); }
+  });
+} else {
+  console.warn('express-ws not initialized, cannot register hyperventilation WS route');
+}
+
+// Bridge neuroService broadcasts to hyperventilation WS clients as well
+try {
+  const _origBroadcast = neuroService.broadcast.bind(neuroService);
+  neuroService.broadcast = (payload) => {
+    try { _origBroadcast(payload); } catch (e) { console.error('neuroService broadcast error', e); }
+    try { hvWs.broadcast(payload); } catch (e) { /* ignore hv broadcast errors */ }
+  };
+} catch (e) {
+  console.warn('Failed to bridge neuroService broadcasts to hyperventilation WS', e);
+}
 
 // Mount neuro REST routes (provides /api/assessment/start, /api/assessment/stop, etc.)
 app.use('/api/assessment', neuroRouter);
@@ -74,11 +96,29 @@ app.use((req, res, next) => {
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/samarth") // Added fallback for local dev
-  .then(() => {
+  .then(async () => {
     console.log('Connected to MongoDB');
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+    const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for ESP32 connections
+    
+    // Get network interfaces before starting server
+    const os = await import('os');
+    const nets = os.networkInterfaces();
+    const addresses = [];
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          addresses.push(`${name}: ${net.address}`);
+        }
+      }
+    }
+    
+    app.listen(PORT, HOST, () => {
+      console.log(`Server is running on ${HOST}:${PORT}`);
+      console.log('\n📡 Available network interfaces for ESP32:');
+      addresses.forEach(addr => console.log(`  ✓ ${addr}`));
+      console.log('\n⚠️  Update ESP32 firmware ws_host to one of the above IPs\n');
+      
       // Optionally start the neuro data simulator for demos
       if (process.env.NEURO_SIMULATOR === 'true') {
         startSimulator();

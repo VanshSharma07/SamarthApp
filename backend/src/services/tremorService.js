@@ -24,9 +24,9 @@ function sanitizeDeviceId(raw) {
 }
 
 // Configuration
-const DEFAULT_SAMPLE_RATE = 50; // Hz (ESP32 sends every ~20ms by default)
-const FFT_WINDOW = 256; // number of samples for FFT (power of two)
-const MIN_WINDOW = 64;
+const DEFAULT_SAMPLE_RATE = 200; // Hz (↑ updated from 50 to match new ESP32 firmware at 200 Hz for cleaner FFT peaks)
+const FFT_WINDOW = 1024; // 1024 samples at 200 Hz = 5.12 seconds (medical-grade window for tremor frequency resolution)
+const MIN_WINDOW = 400; // 400 samples at 200 Hz = 2 seconds (minimum window per medical guidance: 2-5 seconds)
 const BAND_LOW = 0.5;
 const BAND_HIGH = 20.0;
 
@@ -281,23 +281,29 @@ export const tremorService = {
   }
 ,
 
-  // Ingest a batch of samples. `samples` is an array of objects like { timestamp, gx,gy,gz,ax,ay,az }
+  // Ingest a batch of samples. `samples` is an array of objects like { timestamp_us, gx,gy,gz,ax,ay,az }
+  // ESP32 firmware now sends timestamp_us (microseconds) for medical-grade accuracy and 200 Hz sample rate
   async ingestBatch(deviceId = 'unknown', samples = [], sampleRate = DEFAULT_SAMPLE_RATE) {
     try {
       if (!Array.isArray(samples) || samples.length === 0) return;
       const key = sanitizeDeviceId(deviceId || 'unknown');
       let buf = deviceBuffers.get(key);
       if (!buf) {
-        buf = { gx: [], gy: [], gz: [], ax: [], ay: [], az: [], timestamps: [] };
+        buf = { gx: [], gy: [], gz: [], ax: [], ay: [], az: [], timestamps: [], timestampUs: [], gyroMag: [] };
         deviceBuffers.set(key, buf);
       }
 
+      // Use sampleRate from firmware batch (now 200 Hz), or fallback to provided or DEFAULT
+      const effectiveSampleRate = sampleRate || DEFAULT_SAMPLE_RATE;
+
       for (const s of samples) {
-        // accept both numeric arrays and objects
-        const ts = s.timestamp || Date.now();
-        const gx = (s.gx !== undefined) ? Number(s.gx) : (s.gy || s.gz) ? 0 : 0;
+        // Prefer timestamp_us (microseconds from ESP32) for better frequency accuracy
+        const tsUsRaw = s.timestamp_us ?? s.timestamp ?? Date.now();
+        const tsUs = typeof tsUsRaw === 'string' ? Number(tsUsRaw) : tsUsRaw;
+        const tsMs = Number.isFinite(tsUs) ? tsUs / 1000 : Date.now();
+        const gx = (s.gx !== undefined) ? Number(s.gx) : 0;
         const gy = (s.gy !== undefined) ? Number(s.gy) : 0;
-        const gz = (s.gz !== undefined) ? Number(s.gz) : (s.value !== undefined ? Number(s.value) : 0);
+        const gz = (s.gz !== undefined) ? Number(s.gz) : 0;
         const ax = (s.ax !== undefined) ? Number(s.ax) : 0;
         const ay = (s.ay !== undefined) ? Number(s.ay) : 0;
         const az = (s.az !== undefined) ? Number(s.az) : 0;
@@ -308,30 +314,31 @@ export const tremorService = {
         buf.ax.push(ax);
         buf.ay.push(ay);
         buf.az.push(az);
-        buf.timestamps.push(ts);
+        buf.timestamps.push(tsMs);
+        buf.timestampUs.push(tsUs);
+
+        // Compute gyro magnitude: |ω| = sqrt(gx² + gy² + gz²) for medical-grade tremor analysis
+        const gyroMagnitude = Math.sqrt(gx * gx + gy * gy + gz * gz);
+        buf.gyroMag.push(gyroMagnitude);
       }
 
-      // Keep buffers bounded (store last ~ 5 * FFT_WINDOW samples)
+      // Keep buffers bounded (store last ~ 5 * FFT_WINDOW samples for longer history)
       const maxKeep = FFT_WINDOW * 5;
-      for (const k of ['gx','gy','gz','ax','ay','az','timestamps']) {
+      for (const k of ['gx','gy','gz','ax','ay','az','timestamps','timestampUs','gyroMag']) {
         if (buf[k].length > maxKeep) buf[k].splice(0, buf[k].length - maxKeep);
       }
 
-      // Compose magnitude signals
-      const N = Math.min(buf.gz.length, buf.ax.length);
-      const magAcc = new Array(N);
-      for (let i = 0; i < N; i++) {
-        const vx = buf.ax[i], vy = buf.ay[i], vz = buf.az[i];
-        magAcc[i] = Math.sqrt(vx*vx + vy*vy + vz*vz);
-      }
+      // Use pre-computed gyro magnitude (|ω|) for FFT analysis
+      // This is medically more relevant for tremor assessment than acceleration
+      const N = buf.gyroMag.length;
+      if (N < MIN_WINDOW) return; // Not enough data for reliable FFT yet
 
-      // Choose analysis signal: use gyroscope magnitude if available else accel magnitude
-      const gyroMag = new Array(N);
-      for (let i = 0; i < N; i++) gyroMag[i] = Math.sqrt(buf.gx[i]*buf.gx[i] + buf.gy[i]*buf.gy[i] + buf.gz[i]*buf.gz[i]);
+      // Take the last FFT_WINDOW samples for 5-second window at 200 Hz (or proportional at other rates)
+      const signal = buf.gyroMag.slice(-FFT_WINDOW);
 
-      // Run Welch PSD on gyroMag and acc magnitude
-      const gyroRes = welchPSD(gyroMag, sampleRate);
-      const accRes = welchPSD(magAcc, sampleRate);
+      // Run Welch PSD on gyro magnitude with medical-grade window sizing
+      const gyroRes = welchPSD(signal, effectiveSampleRate);
+      const accRes = welchPSD(signal, effectiveSampleRate);
 
       let metrics = null;
       if (gyroRes && gyroRes.freqs && gyroRes.psd) {
@@ -351,12 +358,12 @@ export const tremorService = {
 
           // stability estimate: compute peak per window and variance
           const windowSec = 2.0; const overlap = 0.5;
-          const winLen = Math.max(MIN_WINDOW, Math.floor(windowSec * sampleRate));
+          const winLen = Math.max(MIN_WINDOW, Math.floor(windowSec * effectiveSampleRate));
           const step = Math.floor(winLen * (1 - overlap));
           const peaks = [];
-          for (let start = 0; start + winLen <= gyroMag.length; start += step) {
-            const slice = gyroMag.slice(start, start + winLen);
-            const res = welchPSD(slice, sampleRate);
+          for (let start = 0; start + winLen <= signal.length; start += step) {
+            const slice = signal.slice(start, start + winLen);
+            const res = welchPSD(slice, effectiveSampleRate);
             if (!res) continue;
             let bi = -1; let bv = 0;
             for (let i = 0; i < res.freqs.length; i++) {
@@ -421,12 +428,14 @@ export const tremorService = {
     for (let i = start; i < start + len; i++) {
       result.samples.push({
         timestamp: buf.timestamps[i] || null,
+        timestamp_us: buf.timestampUs ? buf.timestampUs[i] || null : null,
         gx: buf.gx[i] || 0,
         gy: buf.gy[i] || 0,
         gz: buf.gz[i] || 0,
         ax: buf.ax[i] || 0,
         ay: buf.ay[i] || 0,
-        az: buf.az[i] || 0
+        az: buf.az[i] || 0,
+        value: buf.gyroMag ? buf.gyroMag[i] || 0 : undefined
       });
     }
     return result;

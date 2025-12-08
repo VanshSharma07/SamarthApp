@@ -43,6 +43,27 @@ const Tremor = ({ userId, onComplete }) => {
     setLogs(l => [ `${new Date().toLocaleTimeString()}: ${msg}`, ...l ].slice(0, 50));
   }
 
+  function deriveTremorType(freq) {
+    const f = Number(freq);
+    if (!Number.isFinite(f) || f === null || f === undefined || f < 0.1) return 'None';
+    if (f < 2) return 'Very Slow';
+    if (f < 4) return 'Slow Tremor';
+    if (f < 7) return 'Resting';
+    if (f < 12) return 'Postural';
+    return 'Action/Intention';
+  }
+
+  function deriveSeverity(freq, amp) {
+    const f = Number(freq);
+    const a = Number(amp);
+    if ((!Number.isFinite(f) || f < 0.1) && (!Number.isFinite(a) || a < 0.1)) return 'None';
+    const score = (Math.max(0, f || 0) * 8.33 * 0.4) + (Math.max(0, a || 0) * 0.6);
+    if (score > 70) return 'Severe';
+    if (score > 40) return 'Moderate';
+    if (score > 10) return 'Mild';
+    return 'None';
+  }
+
   function connect() {
     // if there's already an open or connecting socket, don't create another
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) return;
@@ -54,21 +75,38 @@ const Tremor = ({ userId, onComplete }) => {
       ws.onmessage = (evt) => {
         try {
           const data = JSON.parse(evt.data);
-          if (data.type === 'metrics') {
-            setMetrics(data.metrics);
-            // capture deviceId if present
-            if (data.deviceId) setDeviceId(data.deviceId);
-            addLog(`Metrics received from ${data.deviceId || 'device'}: freq=${data.metrics.tremor_frequency}Hz amp=${data.metrics.tremor_amplitude}`);
 
-            // append to history for charting
+          // Normalize both legacy "metrics" payloads and analyzer "summary" payloads
+          let nextMetrics = null;
+          if (data.type === 'metrics' && data.metrics) {
+            nextMetrics = { ...data.metrics };
+          } else if (data.dominantFrequencyHz !== undefined || data.type === 'summary') {
+            const freq = data.dominantFrequencyHz ?? null;
+            const amp = data.dominantAmplitude ?? null;
+            nextMetrics = {
+              tremor_frequency: freq,
+              tremor_amplitude: amp,
+              tremor_type: deriveTremorType(freq),
+              severity: deriveSeverity(freq, amp),
+              bandPower3to7Hz: data.bandPower3to7Hz ?? null,
+              windowDurationSec: data.windowDurationSec ?? null
+            };
+          }
+
+          if (nextMetrics) {
+            setMetrics(nextMetrics);
+            if (data.deviceId) setDeviceId(data.deviceId);
+            setConnected(true);
+            addLog(`Metrics received from ${data.deviceId || 'device'}: freq=${nextMetrics.tremor_frequency ?? '—'}Hz amp=${nextMetrics.tremor_amplitude ?? '—'}`);
+
             const now = data.timestamp || Date.now();
             setHistory(h => {
-              const next = [{ t: now, frequency: data.metrics.tremor_frequency || 0, amplitude: data.metrics.tremor_amplitude || 0 }, ...h];
+              const next = [{ t: now, frequency: nextMetrics.tremor_frequency || 0, amplitude: nextMetrics.tremor_amplitude || 0 }, ...h];
               if (next.length > MAX_HISTORY) next.pop();
               return next;
             });
           }
-        } catch (e) { }
+        } catch (e) { /* ignore parse errors */ }
       };
       wsRef.current = ws;
     } catch (e) { addLog('Failed to create websocket'); }

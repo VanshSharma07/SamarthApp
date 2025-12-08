@@ -90,9 +90,11 @@ const SelectDisorder = () => {
                     </Box>
 
                     <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button variant="contained" onClick={() => handleSelect(d.id)} sx={{ borderRadius: 2 }}>
-                        Select
-                      </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button variant="contained" onClick={() => handleSelect(d.id)} sx={{ borderRadius: 2 }}>
+                            Select
+                          </Button>
+                        </Box>
                     </Box>
                   </CardContent>
                 </MotionCard>

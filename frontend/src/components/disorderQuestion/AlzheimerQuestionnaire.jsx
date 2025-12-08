@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import ReadAloudButton from './ReadAloudButton';
 import ProgressBar from './ProgressBar';
+import { Snackbar, Alert, CircularProgress } from '@mui/material';
 
 const YesNoSometimes = ({ name, value, onChange, fontSize, labels = { yes: 'Yes', no: 'No', sometimes: 'Sometimes' } }) => (
   <FormControl component="fieldset" sx={{ my: 1 }}>
@@ -59,6 +60,10 @@ const AlzheimerQuestionnaire = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [snack, setSnack] = useState({ open: false, message: '', severity: 'info' });
+
+  const DEBUG = (import.meta.env && import.meta.env.VITE_DEBUG === 'true') || false;
 
   // font size state persisted to localStorage
   const [fontSizeKey, setFontSizeKey] = useState('medium');
@@ -171,12 +176,65 @@ const AlzheimerQuestionnaire = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!isFormValid()) return;
-    try {
-      localStorage.setItem('alzheimers_questionnaire', JSON.stringify(form));
-    } catch (err) {
-      console.warn('Failed to save questionnaire locally', err);
-    }
-    navigate(`/assessment?disorder=alzheimers`);
+    (async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+
+        const responses = Object.keys(form).map((k) => ({ questionId: k, questionText: t(k) || k, answer: form[k] }));
+
+        const payload = {
+          userId: userId || undefined,
+          username: localStorage.getItem('userName') || undefined,
+          disorderType: 'alzheimers',
+          title: "Alzheimer's questionnaire",
+          responses,
+          metadata: { source: 'frontend', formVersion: 'v1' }
+        };
+
+        const res = await fetch('http://localhost:5000/api/disorders/questionnaire', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.status === 401) {
+          setSnack({ open: true, message: 'Please login to save questionnaire', severity: 'warning' });
+          try { localStorage.setItem('alzheimers_questionnaire', JSON.stringify(form)); } catch (err) {}
+          navigate(`/assessment?disorder=alzheimers`);
+          return;
+        }
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('Failed to save questionnaire', err);
+          setSnack({ open: true, message: 'Failed to save questionnaire (saved locally)', severity: 'error' });
+          try { localStorage.setItem('alzheimers_questionnaire', JSON.stringify(form)); } catch (err2) {}
+          navigate(`/assessment?disorder=alzheimers`);
+          return;
+        }
+
+        const savedResp = await res.json().catch(() => null);
+        try {
+          localStorage.setItem('alzheimers_questionnaire', JSON.stringify({ saved: true, savedAt: Date.now(), backend: savedResp }));
+        } catch (e) {
+          console.warn('Failed to persist alzheimers_questionnaire flag locally', e);
+        }
+        setSnack({ open: true, message: 'Questionnaire saved', severity: 'success' });
+        navigate(`/assessment?disorder=alzheimers`);
+      } catch (err) {
+        console.error('Submit error', err);
+        setSnack({ open: true, message: 'Submit failed — saved locally', severity: 'error' });
+        try { localStorage.setItem('alzheimers_questionnaire', JSON.stringify(form)); } catch (e) {}
+        navigate(`/assessment?disorder=alzheimers`);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   // compute progress based on required fields (do not change validation rules)
@@ -412,12 +470,22 @@ const AlzheimerQuestionnaire = () => {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} sx={{ display: 'flex', gap: 2, mt: 1 }}>
-            <Button type="submit" variant="contained" disabled={!isFormFilled()}>{t('submit')}</Button>
-            <Button variant="outlined" onClick={() => navigate('/select-disorder')}>
-              {t('back')}
+          <Grid item xs={12} sx={{ display: 'flex', gap: 2, mt: 1, alignItems: 'center' }}>
+            <Button type="submit" variant="contained" disabled={!isFormFilled() || loading} startIcon={loading ? <CircularProgress size={18} /> : null}>
+              {loading ? 'Submitting...' : t('submit')}
             </Button>
+            <Button variant="outlined" onClick={() => navigate('/select-disorder')}>{t('back')}</Button>
+            {DEBUG && (
+              <Button variant="text" color="warning" onClick={() => { try { localStorage.setItem('alzheimers_questionnaire_skipped', 'true'); } catch (e) {} navigate(`/assessment?disorder=alzheimers`); }} sx={{ ml: 1 }}>
+                Skip (debug)
+              </Button>
+            )}
           </Grid>
+          <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+            <Alert onClose={() => setSnack((s) => ({ ...s, open: false }))} severity={snack.severity} sx={{ width: '100%' }}>
+              {snack.message}
+            </Alert>
+          </Snackbar>
         </Grid>
       </Paper>
     </Box>

@@ -28,6 +28,7 @@ import {
   Mic as MicIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
+import { Psychology as PsychologyIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
@@ -35,7 +36,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Import assessment components
 import EyeMovement from '../components/assessments/EyeMovement/EyeMovementTest';
-import NeckMobility from '../components/assessments/NeckMobility';
 // Facial Symmetry assessment removed as per minimal screening requirements
 import Tremor from '../components/assessments/Tremor';
 import ResponseTime from '../components/assessments/ResponseTime';
@@ -44,6 +44,8 @@ import FingerTapping from '../components/assessments/FingerTapping';
 import SpeechPatternAssessment from '../components/assessments/SpeechPatternAssessment';
 import WordListAssessment from '../components/assessments/WordList/WordListAssessment';
 import NeuroAssessment from './NeuroAssessment';
+import HyperventilationResponseTest from './Hyperventilation/HyperventilationResponseTest';
+import StroopTest from '../components/assessments/AlzehmierStrooptest/StroopTest';
 
 // Styled Motion components
 const MotionCard = motion(Card);
@@ -192,6 +194,26 @@ const Assessment = () => {
       route: '/assessment/neuro',
       color: '#F57C00'
     }
+  ,
+    {
+      id: 'hyperventilation',
+      title: 'Hyperventilation Response Test',
+      description: 'Provocation protocol: baseline, hyperventilation, recovery with EEG+ECG monitoring.',
+      icon: MicIcon,
+      component: HyperventilationResponseTest,
+      route: '/assessment/hyperventilation',
+      color: '#d32f2f'
+    }
+  ,
+    {
+      id: 'stroop',
+      title: 'Stroop Test',
+      description: 'Assess cognitive interference and processing speed using color-word tasks.',
+      icon: PsychologyIcon,
+      component: StroopTest,
+      route: '/assessment/stroop',
+      color: '#1976d2'
+    }
   ];
   // Map disorders to relevant assessment IDs (based on your table)
   const disorderAssessmentMap = {
@@ -205,13 +227,15 @@ const Assessment = () => {
     ],
     epilepsy: [
       'eyeMovement',
-      'neuro'
+      'neuro',
+      'hyperventilation'
     ],
     alzheimers: [
       'gaitAnalysis',
       'responseTime',
       'speechPattern',
-      'wordList'
+      'wordList',
+      'stroop'
     ]
   };
 

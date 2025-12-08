@@ -49,6 +49,12 @@ export default function WordListInsights({ testId }) {
               <Paper sx={{ p:2, mt:1, backgroundColor: '#fafafa' }} elevation={0}>
                 <Typography>{insight.summary}</Typography>
               </Paper>
+              {insight.flags && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption">Flags:</Typography>
+                  <Typography sx={{ fontWeight: 600 }}>{Object.keys(insight.flags).filter(k=>insight.flags[k]).join(', ') || 'None'}</Typography>
+                </Box>
+              )}
             </Grid>
 
             <Grid item xs={12} md={6}>
@@ -57,7 +63,16 @@ export default function WordListInsights({ testId }) {
                 {insight.details && insight.details.map(d => (
                   <Box key={d.metric} sx={{ mb: 1 }}>
                     <Typography sx={{ fontWeight: 600 }}>{d.metric.replace(/_/g, ' ')}</Typography>
-                    <Typography>{`Value: ${d.value ?? '-'}  |  Z: ${d.zScore !== null ? Number(d.zScore).toFixed(2) : '-'}`}</Typography>
+                    <Typography>{`Value: ${(() => {
+                      const v = d.value;
+                      if (v === null || v === undefined) return '-';
+                      if (Array.isArray(v)) return v.join(', ');
+                      if (typeof v === 'object') {
+                        if (d.metric === 'flags') return Object.keys(v).filter(k=>v[k]).join(', ') || '-';
+                        try { return JSON.stringify(v); } catch (e) { return String(v); }
+                      }
+                      return String(v);
+                    })()}`}</Typography>
                   </Box>
                 ))}
               </Box>
