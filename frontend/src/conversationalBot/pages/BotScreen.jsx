@@ -55,13 +55,19 @@ export default function BotScreen({ onComplete, userId }) {
     };
   }, []);
 
+  // Stop Audio Helper
+  const stopAudio = () => {
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+    }
+    setIsBotSpeaking(false);
+  };
+
   // Audio Playback
   async function playAudio(base64) {
-    // Stop previous audio if any
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    stopAudio(); // Stop any previous
 
     setIsBotSpeaking(true);
     const audio = new Audio(base64);
@@ -84,8 +90,9 @@ export default function BotScreen({ onComplete, userId }) {
   async function handleUserResponse(text) {
     if (!text || !text.trim()) return;
     
+    stopAudio(); // Ensure bot stops if user interrupts
     addUser(text);
-    setInputText(''); // Clear input
+    setInputText(''); 
 
     // Basic Lang Detect
     if (text.toLowerCase().includes('hindi')) setLanguage('hi');
@@ -136,16 +143,26 @@ export default function BotScreen({ onComplete, userId }) {
   // Auto-mic control
   useEffect(() => {
     if (!hasStarted) return;
+    
+    let timer;
+
     if (isBotSpeaking) {
       stopListening();
       setVisualListening(false);
     } else {
       // Auto-start listening if appropriate
       if (!isFinished && messages.length > 0 && !isProcessing) {
-        startListening();
-        setVisualListening(true);
+        // Add delay to prevent echo
+        timer = setTimeout(() => {
+            startListening();
+            setVisualListening(true);
+        }, 800); // 800ms delay for safety
       }
     }
+
+    return () => {
+        if(timer) clearTimeout(timer);
+    };
   }, [isBotSpeaking, hasStarted, isFinished, startListening, stopListening, messages.length, isProcessing]);
 
   const toggleMic = () => {
