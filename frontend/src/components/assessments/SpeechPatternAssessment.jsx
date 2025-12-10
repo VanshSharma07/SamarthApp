@@ -14,9 +14,19 @@ import {
   AccordionDetails, 
   LinearProgress,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Chip,
+  Stepper,
+  Step,
+  StepLabel,
+  Paper
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
+import MicIcon from '@mui/icons-material/Mic';
+import InfoIcon from '@mui/icons-material/Info';
 import { MLService } from '../../services/mlService';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { specializedAssessments } from '../../services/api';
@@ -27,37 +37,182 @@ import {
   EmotionLegend
 } from './SpeechVisualization';
 
-const MetricDisplay = ({ label, value, suffix = '%', color = 'primary' }) => {
+// Floating animation keyframes
+const floatingKeyframes = `
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  @keyframes slideIn {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  .float-animation {
+    animation: float 3s ease-in-out infinite;
+  }
+  .pulse-animation {
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .slide-in {
+    animation: slideIn 0.5s ease-out;
+  }
+`;
+
+// Clinical interpretation helper
+const getStatusIcon = (value, threshold = 50) => {
+  if (value >= 75) return <CheckCircleIcon sx={{ color: '#4caf50', fontSize: '1.2rem' }} />;
+  if (value >= threshold) return <WarningIcon sx={{ color: '#ff9800', fontSize: '1.2rem' }} />;
+  return <ErrorIcon sx={{ color: '#f44336', fontSize: '1.2rem' }} />;
+};
+
+const getStatusColor = (value, threshold = 50) => {
+  if (value >= 75) return 'success';
+  if (value >= threshold) return 'warning';
+  return 'error';
+};
+
+const getInterpretation = (value, metric) => {
+  switch (metric) {
+    case 'clarity':
+      if (value >= 75) return 'Clear & understandable speech';
+      if (value >= 50) return 'Mild clarity issues - may need repetition';
+      return 'Significant clarity issues - difficult to understand';
+    case 'speechRate':
+      if (value >= 120 && value <= 180) return 'Normal speech rate';
+      if (value > 180) return 'Speech too rapid - consider slowing down';
+      return 'Speech too slow - may indicate processing difficulty';
+    case 'confidence':
+      if (value >= 75) return 'Confident, steady speech';
+      if (value >= 50) return 'Mild hesitation or uncertainty';
+      return 'Significant hesitation - may indicate cognitive effort';
+    case 'stress':
+      if (value >= 75) return 'High stress indicators';
+      if (value >= 50) return 'Moderate stress level';
+      return 'Low stress - relaxed speech';
+    default:
+      return '';
+  }
+};
+
+const MetricDisplay = ({ label, value, suffix = '%', color = 'primary', metric = '' }) => {
   const theme = useTheme();
+  const actualValue = Math.min(Math.max(value, 0), 100);
+  const interpretation = getInterpretation(actualValue, metric);
+  const statusColor = getStatusColor(actualValue);
   
   return (
-    <Box sx={{ mb: 1 }}>
-      <Typography variant="body2" color="textSecondary" gutterBottom>
-        {label}
-      </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <Box sx={{ width: '100%', mr: 1 }}>
-          <LinearProgress 
-            variant="determinate" 
-            value={Math.min(Math.max(value, 0), 100)} 
-            color={color}
-            sx={{ 
-              height: 8, 
-              borderRadius: 4,
-              backgroundColor: theme.palette.grey[200],
-              '& .MuiLinearProgress-bar': {
-                borderRadius: 4
-              }
-            }}
-          />
-        </Box>
-        <Box sx={{ minWidth: 45 }}>
-          <Typography variant="body2" color="textSecondary">
-            {value.toFixed(1)}{suffix}
+    <Box sx={{ mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+        <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 600 }}>
+          {label}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {getStatusIcon(actualValue)}
+          <Typography variant="body2" color={statusColor} sx={{ fontWeight: 'bold', minWidth: 50 }}>
+            {actualValue.toFixed(1)}{suffix}
           </Typography>
         </Box>
       </Box>
+      <LinearProgress 
+        variant="determinate" 
+        value={actualValue} 
+        color={statusColor}
+        sx={{ 
+          height: 10, 
+          borderRadius: 4,
+          backgroundColor: theme.palette.grey[200],
+          '& .MuiLinearProgress-bar': {
+            borderRadius: 4
+          }
+        }}
+      />
+      {interpretation && (
+        <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: 'block', fontStyle: 'italic' }}>
+          {interpretation}
+        </Typography>
+      )}
     </Box>
+  );
+};
+
+// Pre-Assessment Guidance Component
+const GuidancePanel = ({ onStartAssessment }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  const guidanceSteps = [
+    {
+      title: 'Find a quiet location',
+      description: 'Choose a quiet room with minimal background noise for accurate assessment',
+      icon: '🔇'
+    },
+    {
+      title: 'Sit comfortably',
+      description: 'Sit upright and keep your microphone at comfortable distance (10-15cm)',
+      icon: '🪑'
+    },
+    {
+      title: 'Speak clearly',
+      description: 'Read phrases naturally and clearly at a comfortable pace',
+      icon: '🗣️'
+    },
+    {
+      title: 'Three assessment rounds',
+      description: 'You will read three different phrases (10 seconds each) for accurate analysis',
+      icon: '🔄'
+    }
+  ];
+
+  return (
+    <Card sx={{ mb: 3, backgroundColor: theme.palette.info.light + '20', border: `2px solid ${theme.palette.info.main}` }}>
+      <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <InfoIcon sx={{ color: theme.palette.info.main }} />
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            How to Prepare for Assessment
+          </Typography>
+        </Box>
+        
+        <Grid container spacing={2}>
+          {guidanceSteps.map((step, index) => (
+            <Grid item xs={12} sm={6} key={index} className="slide-in" sx={{ animationDelay: `${index * 0.1}s` }}>
+              <Paper sx={{ p: 2, textAlign: 'center', backgroundColor: 'white' }}>
+                <Box sx={{ fontSize: isMobile ? '2rem' : '2.5rem', mb: 1, display: 'inline-block', animation: 'float 3s ease-in-out infinite' }}>
+                  {step.icon}
+                </Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                  {step.title}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {step.description}
+                </Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+
+        <Box sx={{ mt: 3, p: 2, backgroundColor: theme.palette.warning.light + '20', borderRadius: 1, borderLeft: `4px solid ${theme.palette.warning.main}` }}>
+          <Typography variant="body2" color="textSecondary">
+            ⚠️ <strong>Important:</strong> Ensure your device microphone is working properly before starting the assessment.
+          </Typography>
+        </Box>
+
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          sx={{ mt: 3, py: 1.5, fontSize: '1rem', fontWeight: 'bold' }}
+          onClick={onStartAssessment}
+        >
+          <MicIcon sx={{ mr: 1 }} />
+          Start Assessment
+        </Button>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -67,7 +222,17 @@ const SpeechPatternAssessment = ({ userId, onComplete }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   
+  // Assessment phases
+  const PHASE = {
+    GUIDANCE: 'guidance',
+    ASSESSING: 'assessing',
+    ANALYZING: 'analyzing',
+    RESULTS: 'results',
+    COMPLETED: 'completed'
+  };
+
   // State management
+  const [currentPhase, setCurrentPhase] = useState(PHASE.GUIDANCE);
   const [isLoading, setIsLoading] = useState(false);
   const [isAssessing, setIsAssessing] = useState(false);
   const [error, setError] = useState(null);
@@ -80,6 +245,9 @@ const SpeechPatternAssessment = ({ userId, onComplete }) => {
   const [canComplete, setCanComplete] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
+  const [sampleCount, setSampleCount] = useState(1); // Track multiple samples for accuracy
+  const MAX_SAMPLES = 3; // Collect 3 samples for better accuracy
+  const [allMetrics, setAllMetrics] = useState([]); // Store all metrics from all samples
   const [visualizationData, setVisualizationData] = useState({
     waveform: null,
     pitch: null,
@@ -91,11 +259,23 @@ const SpeechPatternAssessment = ({ userId, onComplete }) => {
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
 
-  // Test phrases
+  // Test phrases with instructions
   const testPhrases = [
-    "Today is a sunny day outside",
-    "I enjoy listening to music in my free time",
-    "Please count from one to ten slowly"
+    {
+      text: "Today is a sunny day outside",
+      instruction: "Read this sentence naturally",
+      difficulty: "Neutral sentence"
+    },
+    {
+      text: "I enjoy listening to music in my free time",
+      instruction: "Read with natural expression",
+      difficulty: "Complex sentence"
+    },
+    {
+      text: "Please count from one to ten slowly",
+      instruction: "Count at a comfortable pace",
+      difficulty: "Sequential counting"
+    }
   ];
 
 // Add after state declarations and before useEffect
@@ -191,6 +371,7 @@ const floatTo16BitPCM = (view, offset, input) => {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: false, // Disable auto gain for better accuracy
           sampleRate: 44100
         }
       });
@@ -222,7 +403,7 @@ const floatTo16BitPCM = (view, offset, input) => {
           
           // Create visualization data from audioBuffer
           const rawData = audioBuffer.getChannelData(0);
-          const dataPoints = isMobile ? 50 : 100; // Fewer points for mobile devices
+          const dataPoints = isMobile ? 50 : 100;
           const waveformData = processWaveformData(rawData, dataPoints);
           
           // Create WAV file
@@ -230,7 +411,7 @@ const floatTo16BitPCM = (view, offset, input) => {
           const results = await MLService.analyzeSpeechPattern(wavBlob);
           
           if (results.success) {
-            setMetrics({
+            const newMetrics = {
               ...results.metrics,
               timeSeries: {
                 waveform: waveformData,
@@ -243,21 +424,44 @@ const floatTo16BitPCM = (view, offset, input) => {
                 stress: results.metrics.timeSeries?.stress || [],
                 hesitation: results.metrics.timeSeries?.hesitation || []
               }
-            });
-            setCanComplete(true);
-            setRetryCount(0);
+            };
+
+            // Store this sample's metrics
+            const updatedAllMetrics = [...allMetrics, newMetrics];
+            setAllMetrics(updatedAllMetrics);
+
+            // If we have multiple samples, average them for better accuracy
+            if (sampleCount < MAX_SAMPLES) {
+              // Reset state for next sample
+              setCurrentPhrase((sampleCount) % 3); // Cycle through phrases
+              setSampleCount(sampleCount + 1);
+              setMetrics(newMetrics); // Show current metrics
+              setRetryCount(0);
+              setIsAssessing(false); // Reset assessing state
+              setTimeRemaining(10); // Reset timer for next sample
+              setCurrentPhase(PHASE.GUIDANCE); // Go back to guidance for next phrase
+              setIsAnalyzing(false);
+            } else {
+              // All samples collected - calculate average metrics
+              const averagedMetrics = averageMetrics(updatedAllMetrics);
+              setMetrics(averagedMetrics);
+              setCanComplete(true);
+              setRetryCount(0);
+              setIsAssessing(false); // Reset assessing state
+              setCurrentPhase(PHASE.RESULTS);
+              setIsAnalyzing(false);
+            }
           } else {
             throw new Error(results.error || 'Analysis failed');
           }
         } catch (err) {
           handleError(err);
-        } finally {
-          setIsAnalyzing(false);
         }
       };
 
       mediaRecorder.start(100);
       setIsAssessing(true);
+      setCurrentPhase(PHASE.ASSESSING);
 
       // Set timer
       timerRef.current = setInterval(() => {
@@ -275,6 +479,38 @@ const floatTo16BitPCM = (view, offset, input) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Average metrics from multiple samples for improved accuracy
+  const averageMetrics = (metricsArray) => {
+    if (metricsArray.length === 0) return metricsArray[0];
+
+    const avgMetrics = {
+      clarity: metricsArray.reduce((sum, m) => sum + (m.clarity || 0), 0) / metricsArray.length,
+      speech_rate: metricsArray.reduce((sum, m) => sum + (m.speech_rate || 0), 0) / metricsArray.length,
+      volume_control: metricsArray.reduce((sum, m) => sum + (m.volume_control || 0), 0) / metricsArray.length,
+      pitch_stability: metricsArray.reduce((sum, m) => sum + (m.pitch_stability || 0), 0) / metricsArray.length,
+      emotion: {
+        confidence: metricsArray.reduce((sum, m) => sum + (m.emotion?.confidence || 0), 0) / metricsArray.length,
+        hesitation: metricsArray.reduce((sum, m) => sum + (m.emotion?.hesitation || 0), 0) / metricsArray.length,
+        stress: metricsArray.reduce((sum, m) => sum + (m.emotion?.stress || 0), 0) / metricsArray.length,
+        monotony: metricsArray.reduce((sum, m) => sum + (m.emotion?.monotony || 0), 0) / metricsArray.length
+      },
+      articulation: {
+        precision: metricsArray.reduce((sum, m) => sum + (m.articulation?.precision || 0), 0) / metricsArray.length,
+        vowel_formation: metricsArray.reduce((sum, m) => sum + (m.articulation?.vowel_formation || 0), 0) / metricsArray.length,
+        consonant_precision: metricsArray.reduce((sum, m) => sum + (m.articulation?.consonant_precision || 0), 0) / metricsArray.length,
+        slurred_speech: metricsArray.reduce((sum, m) => sum + (m.articulation?.slurred_speech || 0), 0) / metricsArray.length
+      },
+      fluency: {
+        fluency_score: metricsArray.reduce((sum, m) => sum + (m.fluency?.fluency_score || 0), 0) / metricsArray.length,
+        words_per_minute: metricsArray.reduce((sum, m) => sum + (m.fluency?.words_per_minute || 0), 0) / metricsArray.length,
+        pause_rate: metricsArray.reduce((sum, m) => sum + (m.fluency?.pause_rate || 0), 0) / metricsArray.length
+      },
+      timeSeries: metricsArray[metricsArray.length - 1].timeSeries // Use last sample for visualization
+    };
+
+    return avgMetrics;
   };
 
   // Fallback data generator for visualizations
@@ -313,6 +549,10 @@ const floatTo16BitPCM = (view, offset, input) => {
     try {
       setIsLoading(true);
       
+      if (!metrics) {
+        throw new Error('No metrics available');
+      }
+
       // Format metrics to match the expected schema structure
       const formattedMetrics = {
         clarity: { 
@@ -344,7 +584,9 @@ const floatTo16BitPCM = (view, offset, input) => {
         pitch_stability: metrics.pitch_stability || 0,
         overallScore: ((metrics.clarity * 100) + 
                       (metrics.volume_control * 100) + 
-                      ((1 - metrics.emotion?.hesitation || 0) * 100)) / 3
+                      ((1 - metrics.emotion?.hesitation || 0) * 100)) / 3,
+        samplesCollected: sampleCount, // Track how many samples were averaged
+        assessmentConfidence: (sampleCount / MAX_SAMPLES) * 100 // Confidence based on samples
       };
 
       // Prepare assessment data
@@ -361,6 +603,7 @@ const floatTo16BitPCM = (view, offset, input) => {
 
       if (response.data.success) {
         setAssessmentComplete(true);
+        setCurrentPhase(PHASE.COMPLETED);
         if (onComplete) {
           onComplete(assessmentData);
         }
@@ -377,6 +620,11 @@ const floatTo16BitPCM = (view, offset, input) => {
 
   const handleError = (error) => {
     console.error('Speech assessment error:', error);
+    setIsAssessing(false);
+    setIsAnalyzing(false);
+    setIsLoading(false);
+    setTimeRemaining(10); // Reset timer
+    
     if (retryCount < MAX_RETRIES) {
       setRetryCount(prev => prev + 1);
       setError(`Analysis failed, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
@@ -391,76 +639,117 @@ const floatTo16BitPCM = (view, offset, input) => {
   if (!browserSupported) {
     return (
       <Alert severity="error">
-        Your browser does not support speech recognition. Please use Chrome, Edge, or Safari.
+        Your browser does not support speech recording. Please use Chrome, Edge, or Safari.
       </Alert>
     );
   }
 
   return (
     <Box sx={{ p: isMobile ? 1 : 2 }}>
+      <style>{floatingKeyframes}</style>
+      
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, animation: 'slideIn 0.5s ease-out' }}>
           {error}
         </Alert>
       )}
 
-      <Card sx={{ mb: 2 }}>
-        <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Speech Pattern Assessment
+      {/* Progress Indicator */}
+      <Card sx={{ mb: 3, backgroundColor: theme.palette.primary.light + '10' }}>
+        <CardContent sx={{ py: 2, px: isMobile ? 2 : 3 }}>
+          <Stepper activeStep={sampleCount - 1} sx={{ mb: 1 }}>
+            {[0, 1, 2].map((i) => (
+              <Step key={i} completed={i < sampleCount}>
+                <StepLabel>Sample {i + 1}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+          <Typography variant="caption" color="textSecondary">
+            Assessment progresses: {sampleCount}/{MAX_SAMPLES} samples collected
           </Typography>
-          <Typography variant="body1" gutterBottom>
-            Please read the following phrase:
-          </Typography>
-          <Typography 
-            variant={isMobile ? "body1" : "h5"} 
-            color="primary" 
-            gutterBottom
-            sx={{ 
-              p: 2, 
-              backgroundColor: `${theme.palette.background.default}80`, 
-              borderRadius: 1,
-              fontWeight: 'medium'
-            }}
-          >
-            {testPhrases[currentPhrase]}
-          </Typography>
-          
-          {!isAssessing && !assessmentComplete && (
-            <Button 
-              variant="contained" 
-              onClick={startAssessment}
-              disabled={isLoading}
-              fullWidth={isMobile}
-              sx={{ mt: 2 }}
-            >
-              {isLoading ? 'Preparing...' : 'Start Assessment'}
-            </Button>
-          )}
+        </CardContent>
+      </Card>
 
-          {isAssessing && (
+      {/* Guidance Phase */}
+      {currentPhase === PHASE.GUIDANCE && (
+        <>
+          <GuidancePanel onStartAssessment={startAssessment} />
+          
+          <Card sx={{ mb: 2 }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+              <Box sx={{ backgroundColor: theme.palette.primary.light + '20', p: 2, borderRadius: 1, mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  Sample {sampleCount} of {MAX_SAMPLES}
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.palette.primary.main, mb: 1 }}>
+                  {testPhrases[currentPhrase].text}
+                </Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+                  📋 {testPhrases[currentPhrase].instruction}
+                </Typography>
+                <Chip 
+                  label={testPhrases[currentPhrase].difficulty}
+                  size="small"
+                  variant="outlined"
+                />
+              </Box>
+
+              <Button 
+                variant="contained" 
+                color="primary"
+                onClick={startAssessment}
+                disabled={isLoading}
+                fullWidth={isMobile}
+                sx={{ mt: 2, py: 1.2, fontSize: '1rem', fontWeight: 'bold' }}
+              >
+                <MicIcon sx={{ mr: 1 }} />
+                {isLoading ? 'Preparing Microphone...' : `Start Recording - Sample ${sampleCount}`}
+              </Button>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Recording Phase */}
+      {currentPhase === PHASE.ASSESSING && (
+        <Card sx={{ mb: 2, backgroundColor: theme.palette.error.light + '10', border: `2px solid ${theme.palette.error.main}` }}>
+          <CardContent sx={{ p: isMobile ? 2 : 3, textAlign: 'center' }}>
+            <Box className="pulse-animation" sx={{ mb: 2 }}>
+              <MicIcon sx={{ fontSize: '4rem', color: theme.palette.error.main }} />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>
+              Recording in progress...
+            </Typography>
             <Box sx={{ 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
               flexDirection: isMobile ? 'column' : 'row',
-              mt: 2 
+              gap: 2
             }}>
               <CircularProgress 
                 variant="determinate" 
                 value={(1 - timeRemaining/10) * 100} 
-                size={40} 
-                sx={{ mb: isMobile ? 1 : 0, mr: isMobile ? 0 : 2 }}
+                size={isMobile ? 60 : 80}
               />
-              <Typography variant={isMobile ? "body1" : "h6"} color="primary">
-                Time Remaining: {timeRemaining}s
-              </Typography>
+              <Box>
+                <Typography variant={isMobile ? "h5" : "h4"} color="error" sx={{ fontWeight: 'bold' }}>
+                  {timeRemaining}s
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  remaining
+                </Typography>
+              </Box>
             </Box>
-          )}
-        </CardContent>
-      </Card>
+            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 2 }}>
+              Please read the phrase clearly and naturally
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
 
-      {isAnalyzing && (
+      {/* Analyzing Phase */}
+      {currentPhase === PHASE.ANALYZING && (
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ 
             display: 'flex', 
@@ -469,60 +758,106 @@ const floatTo16BitPCM = (view, offset, input) => {
             flexDirection: 'column',
             p: isMobile ? 2 : 3
           }}>
-            <CircularProgress size={isMobile ? 30 : 40} sx={{ mb: 2 }} />
-            <Typography variant={isMobile ? "body1" : "h6"}>
+            <CircularProgress size={isMobile ? 40 : 60} sx={{ mb: 2 }} />
+            <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontWeight: 'bold', mb: 1 }}>
               Analyzing speech patterns...
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              Generating visualizations
+              Processing acoustic features & generating insights
             </Typography>
           </CardContent>
         </Card>
       )}
 
-      {metrics && !isAnalyzing && !assessmentComplete && (
+      {/* Results Phase */}
+      {currentPhase === PHASE.RESULTS && metrics && (
         <Card>
-          <CardContent sx={{ p: isMobile ? 1 : 2 }}>
-            <Typography variant="h6" gutterBottom>Speech Analysis Results</Typography>
+          <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>
+              📊 Assessment Results
+            </Typography>
             
+            {/* Assessment Confidence */}
+            <Paper sx={{ p: 2, mb: 3, backgroundColor: theme.palette.success.light + '20', border: `1px solid ${theme.palette.success.main}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                    Assessment Confidence
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Based on {sampleCount} voice samples
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="h6" color="success.main" sx={{ fontWeight: 'bold' }}>
+                    {((sampleCount / MAX_SAMPLES) * 100).toFixed(0)}%
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Accurate
+                  </Typography>
+                </Box>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={(sampleCount / MAX_SAMPLES) * 100}
+                sx={{ mt: 1, height: 8, borderRadius: 4 }}
+                color="success"
+              />
+            </Paper>
+
+            {/* Key Findings */}
             <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Basic Metrics</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  📌 Key Findings
+                </Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Grid container spacing={isMobile ? 1 : 2}>
-                  <Grid item xs={12} md={4}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
                     <MetricDisplay 
-                      label="Overall Clarity" 
-                      value={metrics.clarity * 100} 
+                      label="Speech Clarity" 
+                      value={metrics.clarity * 100}
+                      metric="clarity"
                     />
                   </Grid>
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} sm={6}>
                     <MetricDisplay 
-                      label="Speech Rate" 
-                      value={metrics.speech_rate} 
+                      label="Speech Rate (WPM)" 
+                      value={metrics.speech_rate}
                       suffix=" wpm"
+                      metric="speechRate"
                     />
                   </Grid>
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} sm={6}>
                     <MetricDisplay 
                       label="Volume Control" 
-                      value={metrics.volume_control * 100} 
+                      value={metrics.volume_control * 100}
+                      metric="volumeControl"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MetricDisplay 
+                      label="Pitch Stability" 
+                      value={metrics.pitch_stability * 100}
                     />
                   </Grid>
                 </Grid>
               </AccordionDetails>
             </Accordion>
 
+            {/* Articulation Details */}
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Articulation Details</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  🗣️ Articulation Quality
+                </Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Grid container spacing={isMobile ? 1 : 2}>
+                <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <MetricDisplay 
-                      label="Precision" 
+                      label="Sound Precision" 
                       value={metrics.articulation?.precision * 100 || 0} 
                     />
                   </Grid>
@@ -534,13 +869,13 @@ const floatTo16BitPCM = (view, offset, input) => {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <MetricDisplay 
-                      label="Consonant Precision" 
+                      label="Consonant Clarity" 
                       value={metrics.articulation?.consonant_precision * 100 || 0} 
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <MetricDisplay 
-                      label="Speech Clarity" 
+                      label="Speech Fluidity" 
                       value={(1 - (metrics.articulation?.slurred_speech || 0)) * 100} 
                     />
                   </Grid>
@@ -548,85 +883,92 @@ const floatTo16BitPCM = (view, offset, input) => {
               </AccordionDetails>
             </Accordion>
 
+            {/* Emotional Indicators */}
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Emotional Indicators</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  😊 Emotional & Cognitive Indicators
+                </Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Grid container spacing={isMobile ? 1 : 2}>
-                  <Grid item xs={12} sm={6} md={4}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
                     <MetricDisplay 
-                      label="Confidence" 
-                      value={metrics.emotion.confidence * 100} 
-                      color="success"
+                      label="Confidence Level" 
+                      value={metrics.emotion.confidence * 100}
+                      metric="confidence"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
+                  <Grid item xs={12} sm={6}>
                     <MetricDisplay 
-                      label="Hesitation" 
-                      value={metrics.emotion.hesitation * 100} 
-                      color="warning"
+                      label="Hesitation Index" 
+                      value={metrics.emotion.hesitation * 100}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
+                  <Grid item xs={12} sm={6}>
                     <MetricDisplay 
                       label="Stress Level" 
-                      value={metrics.emotion.stress * 100} 
-                      color="error"
+                      value={metrics.emotion.stress * 100}
+                      metric="stress"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MetricDisplay 
+                      label="Speech Monotony" 
+                      value={metrics.emotion.monotony * 100}
                     />
                   </Grid>
                 </Grid>
               </AccordionDetails>
             </Accordion>
 
-            {metrics.neurological_indicators && (
-              <Accordion>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>Speech Pattern Analysis</Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Grid container spacing={isMobile ? 1 : 2}>
-                    <Grid item xs={12} sm={6}>
-                      <MetricDisplay 
-                        label="Fluency Score" 
-                        value={metrics.fluency.fluency_score * 100} 
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <MetricDisplay 
-                        label="Pitch Stability" 
-                        value={metrics.pitch_stability * 100} 
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Box sx={{ 
-                        display: 'flex', 
-                        flexWrap: 'wrap', 
-                        gap: 2, 
-                        mt: 1,
-                        justifyContent: isMobile ? 'flex-start' : 'space-around'
-                      }}>
-                        <Typography variant="body2" color="textSecondary">
-                          Words per Minute: {metrics.fluency.words_per_minute.toFixed(1)}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          Pause Rate: {metrics.fluency.pause_rate.toFixed(2)} pauses/sec
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </AccordionDetails>
-              </Accordion>
-            )}
-
+            {/* Fluency Analysis */}
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Speech Visualizations</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  ⏱️ Fluency Analysis
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <MetricDisplay 
+                      label="Fluency Score" 
+                      value={metrics.fluency.fluency_score * 100} 
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MetricDisplay 
+                      label="Pause Rate" 
+                      value={metrics.fluency.pause_rate * 100}
+                      suffix=" /sec"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Box sx={{ p: 2, backgroundColor: theme.palette.grey[100], borderRadius: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                        Speaking Pace: {metrics.speech_rate?.toFixed(1) || 0} words/minute
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Normal range: 120-160 WPM. Faster may indicate anxiety, slower may indicate processing difficulty.
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
+
+            {/* Visualizations */}
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  📈 Voice Pattern Visualizations
+                </Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Grid container spacing={isMobile ? 2 : 3}>
                   <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
                       Waveform
                     </Typography>
                     <WaveformVisualizer 
@@ -636,8 +978,8 @@ const floatTo16BitPCM = (view, offset, input) => {
                   </Grid>
                   
                   <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Pitch Pattern
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      Pitch Contour
                     </Typography>
                     <PitchGraph
                       data={metrics.timeSeries?.pitch || []}
@@ -646,8 +988,8 @@ const floatTo16BitPCM = (view, offset, input) => {
                   </Grid>
                   
                   <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Emotional Indicators
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      Emotional Trends Over Time
                     </Typography>
                     {isMobile && <EmotionLegend />}
                     <EmotionTimeline
@@ -664,16 +1006,31 @@ const floatTo16BitPCM = (view, offset, input) => {
             </Accordion>
 
             {canComplete && (
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+              <Box sx={{ mt: 3, display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
+                {sampleCount < MAX_SAMPLES && (
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => {
+                      setCurrentPhase(PHASE.GUIDANCE);
+                      setTimeRemaining(10);
+                      setIsAssessing(false);
+                    }}
+                    fullWidth={isMobile}
+                  >
+                    Collect Another Sample
+                  </Button>
+                )}
                 <Button
                   variant="contained"
-                  color="primary"
+                  color="success"
                   onClick={handleCompleteAssessment}
                   disabled={isLoading}
                   fullWidth={isMobile}
                   size={isMobile ? "large" : "medium"}
+                  sx={{ fontWeight: 'bold' }}
                 >
-                  {isLoading ? 'Saving...' : 'Complete Assessment'}
+                  {isLoading ? 'Saving...' : 'Save & Complete Assessment'}
                 </Button>
               </Box>
             )}
@@ -681,9 +1038,15 @@ const floatTo16BitPCM = (view, offset, input) => {
         </Card>
       )}
 
-      {assessmentComplete && (
-        <Alert severity="success" sx={{ mt: 2 }}>
-          Assessment completed and saved successfully!
+      {/* Completion Phase */}
+      {currentPhase === PHASE.COMPLETED && (
+        <Alert severity="success" sx={{ mt: 2, animation: 'slideIn 0.5s ease-out' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+            ✅ Assessment Successfully Completed!
+          </Typography>
+          <Typography variant="body2">
+            The assessment has been saved and analyzed using {sampleCount} voice samples. Results are now available in the patient's profile.
+          </Typography>
         </Alert>
       )}
     </Box>

@@ -60,7 +60,10 @@ export default function WordListAssessment({ userId, onComplete }) {
         clearInterval(interval);
         setStudyWord('');
         setCurrentTrial(1);
-        setPhase('recall');
+        // Small delay to ensure state is updated before phase change
+        setTimeout(() => {
+          setPhase('recall');
+        }, 500);
         return;
       }
       setStudyWord(words[i]);
@@ -277,18 +280,30 @@ export default function WordListAssessment({ userId, onComplete }) {
 
       {/* Manual typing removed — voice input only. */}
 
-      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-        {!recording ? (
-          <Button startIcon={<MicIcon />} variant="outlined" onClick={startRecording} aria-label="Start recording">Record</Button>
-        ) : (
-          <Button color="error" startIcon={<StopIcon />} variant="contained" onClick={stopRecording} aria-label="Stop recording">Stop</Button>
-        )}
+      <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          {!recording ? (
+            <Button startIcon={<MicIcon />} variant="outlined" onClick={startRecording} aria-label="Start recording" size="large">Record</Button>
+          ) : (
+            <Button color="error" startIcon={<StopIcon />} variant="contained" onClick={stopRecording} aria-label="Stop recording" size="large">Stop</Button>
+          )}
 
-        {audioUrl && (
-          <IconButton color="primary" onClick={playAudio} aria-label="Play recording"><PlayArrowIcon /></IconButton>
-        )}
+          {audioUrl && (
+            <IconButton color="primary" onClick={playAudio} aria-label="Play recording" size="large"><PlayArrowIcon /></IconButton>
+          )}
+        </Box>
 
-        <Button variant="contained" endIcon={<SendIcon />} onClick={submitTrial} aria-label="Submit trial">Submit</Button>
+        <Button 
+          variant="contained" 
+          color="success"
+          endIcon={<SendIcon />} 
+          onClick={submitTrial} 
+          aria-label="Submit trial"
+          fullWidth
+          sx={{ py: 1.5, fontSize: '1rem', fontWeight: 'bold' }}
+        >
+          Submit Trial {currentTrial}
+        </Button>
 
         {/* Transcript is intentionally not displayed to avoid cueing the participant */}
       </Box>

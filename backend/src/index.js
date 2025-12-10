@@ -38,7 +38,26 @@ registerTremorWs(app);
 // Register hyperventilation WS route so HV frontend clients can connect
 if (typeof app.ws === 'function') {
   app.ws('/tests/hyperventilation/stream', function(ws, req) {
-    try { hvWs.addClient(ws); } catch (e) { console.warn('Failed to add HV WS client', e); }
+    console.log('[index.js] HV WebSocket connection attempt, URL:', req.url);
+    try { 
+      let testId = req.query?.testId;
+      if (!testId && req.url) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        testId = urlParams.get('testId');
+          console.log('[index.js] Fallback URL parsing, extracted testId:', testId);
+      }
+      console.log('[HV WS] Client connecting with testId:', testId, 'from URL:', req.url);
+      // Hard reject connections without a testId to avoid null saves
+      if (!testId) {
+        console.error('[HV WS] ERROR: No testId provided; closing connection to prevent data loss');
+        try { ws.send(JSON.stringify({ error: 'testId parameter required' })); } catch (e) {}
+        try { ws.close(); } catch (e) {}
+        return;
+      }
+      hvWs.addClient(ws, testId); 
+    } catch (e) { 
+      console.error('[HV WS] Failed to add HV WS client:', e); 
+    }
   });
 } else {
   console.warn('express-ws not initialized, cannot register hyperventilation WS route');
@@ -49,7 +68,11 @@ try {
   const _origBroadcast = neuroService.broadcast.bind(neuroService);
   neuroService.broadcast = (payload) => {
     try { _origBroadcast(payload); } catch (e) { console.error('neuroService broadcast error', e); }
-    try { hvWs.broadcast(payload); } catch (e) { /* ignore hv broadcast errors */ }
+    try { 
+      hvWs.broadcast(payload); 
+    } catch (e) { 
+      console.error('[index.js] hvWs.broadcast error:', e);
+    }
   };
 } catch (e) {
   console.warn('Failed to bridge neuroService broadcasts to hyperventilation WS', e);
