@@ -7,6 +7,11 @@ import GaitAnalysisAssessment from '../models/GaitAnalysisAssessment.js';
 import FingerTappingAssessment from '../models/FingerTappingAssessment.js';
 import FacialSymmetryAssessment from '../models/FacialSymmetryAssessment.js';
 import EyeMovementAssessment from '../models/EyeMovementAssessment.js';
+import StroopAssessment from '../models/StroopAssessment.js';
+import Test from '../models/Test.js';
+import Score from '../models/Score.js';
+import EpilepsyTest from '../models/EpilepsyTest.js';
+import AssessmentSession from '../models/AssessmentSession.js';
 import { generateReport } from '../services/reportService.js';
 import { getAiPrediction } from '../services/aiService.js';
 import mongoose from 'mongoose';
@@ -196,16 +201,110 @@ export const getAssessmentHistory = async (req, res) => {
         'gaitAnalysis': GaitAnalysisAssessment,
         'fingerTapping': FingerTappingAssessment,
         'facialSymmetry': FacialSymmetryAssessment,
-        'eyeMovement': EyeMovementAssessment
+        'eyeMovement': EyeMovementAssessment,
+        'stroop': StroopAssessment,
+        'wordlist': Test,
+        'word_list': Test,
+        'neuro': EpilepsyTest,
+        'hyperventilation': EpilepsyTest
       };
       
       // If type is specified, only check that model
       if (type && modelMap[type]) {
         console.log(`Checking ${type} collection...`);
-        assessments = await modelMap[type].find({ userId })
-          .sort({ timestamp: -1 })
-          .limit(parseInt(limit))
-          .lean();
+        let results = [];
+        
+        if (type === 'wordlist' || type === 'word_list') {
+          // For Test model, search by userId as string
+          let tests = await Test.find({ userId })
+            .sort({ startTs: -1, timestamp: -1 })
+            .limit(parseInt(limit))
+            .lean();
+          
+          console.log(`[Assessment] Found ${tests.length} wordlist tests for userId: ${userId}`);
+          
+          // For each test, fetch its scores and aggregate metrics
+          results = await Promise.all(tests.map(async (t) => {
+            try {
+              const scores = await Score.find({ testId: t._id }).lean();
+              console.log(`[Assessment] Test ${t._id}: Found ${scores.length} score records`);
+              
+              const metricsMap = {};
+              scores.forEach(s => {
+                metricsMap[s.metric] = s.value;
+                console.log(`[Assessment] Metric: ${s.metric} = ${s.value}`);
+              });
+              
+              return {
+                ...t,
+                type: 'wordlist',
+                timestamp: t.endTs || t.timestamp || t.startTs,
+                status: t.status || 'COMPLETED',
+                metrics: metricsMap || {}
+              };
+            } catch (err) {
+              console.error('Error fetching scores for test', t._id, err);
+              return {
+                ...t,
+                type: 'wordlist',
+                timestamp: t.endTs || t.timestamp || t.startTs,
+                status: t.status || 'COMPLETED',
+                metrics: {}
+              };
+            }
+          }));
+        } else if (type === 'stroop') {
+          // For Stroop, fetch from StroopAssessment with proper metrics
+          results = await StroopAssessment.find({ userId })
+            .sort({ timestamp: -1 })
+            .limit(parseInt(limit))
+            .lean();
+          
+          results = results.map(r => ({
+            ...r,
+            type: 'stroop',
+            metrics: {
+              score: r.score || 0,
+              total: r.total || 0,
+              accuracy: r.accuracy || 0,
+              history: r.history || []
+            }
+          }));
+        } else if (type === 'neuro' || type === 'hyperventilation') {
+          // For EpilepsyTest, handle both string and ObjectId userId
+          results = await EpilepsyTest.find({ 
+            $or: [
+              { userId },
+              { userId: new mongoose.Types.ObjectId(userId) }
+            ]
+          })
+            .sort({ startedAt: -1 })
+            .limit(parseInt(limit))
+            .lean()
+            .catch(() => []);
+          
+          results = results.map(r => ({
+            ...r,
+            type: 'hyperventilation',
+            timestamp: r.endedAt || r.startedAt,
+            status: r.status || 'completed',
+            metrics: {
+              baseline_hr: r.summaryMetrics?.baselineHR || 0,
+              hv_hr: r.summaryMetrics?.hvHR || 0,
+              recovery_hr: r.summaryMetrics?.recoveryHR || 0,
+              hv_response: 'Normal'
+            }
+          }));
+        } else {
+          // For other models
+          results = await modelMap[type].find({ userId })
+            .sort({ timestamp: -1 })
+            .limit(parseInt(limit))
+            .lean();
+          results = results.map(r => ({...r, type}));
+        }
+        
+        assessments = results;
         console.log(`Found ${assessments.length} ${type} assessments`);
       } 
       // Otherwise check all models
@@ -213,8 +312,20 @@ export const getAssessmentHistory = async (req, res) => {
         console.log('Checking all specialized collections...');
         const promises = [];
         
-        // Collect all promises
-        for (const [modelType, Model] of Object.entries(modelMap)) {
+        // Map of all model types (excluding stroop which has custom handler below)
+        const allModels = {
+          'tremor': TremorAssessment,
+          'speechPattern': SpeechPatternAssessment,
+          'responseTime': ResponseTimeAssessment,
+          'neckMobility': NeckMobilityAssessment,
+          'gaitAnalysis': GaitAnalysisAssessment,
+          'fingerTapping': FingerTappingAssessment,
+          'facialSymmetry': FacialSymmetryAssessment,
+          'eyeMovement': EyeMovementAssessment
+        };
+        
+        // Collect all promises for standard models
+        for (const [modelType, Model] of Object.entries(allModels)) {
           promises.push(
             Model.find({ userId })
               .sort({ timestamp: -1 })
@@ -222,11 +333,127 @@ export const getAssessmentHistory = async (req, res) => {
               .lean()
               .then(results => {
                 console.log(`Found ${results.length} ${modelType} assessments`);
-                // Add type field if it doesn't exist
                 return results.map(r => ({...r, type: modelType}));
+              })
+              .catch(err => {
+                console.error(`Error fetching ${modelType}:`, err);
+                return [];
               })
           );
         }
+        
+        // Add wordlist (Test model) with Score aggregation
+        promises.push(
+          Test.find({ userId })
+            .sort({ startTs: -1, timestamp: -1 })
+            .limit(parseInt(limit))
+            .lean()
+            .then(async (results) => {
+              console.log(`Found ${results.length} wordlist assessments`);
+              // For each test, fetch its scores
+              const testWithScores = await Promise.all(results.map(async (r) => {
+                try {
+                  const scores = await Score.find({ testId: r._id }).lean();
+                  console.log(`[Bulk] Test ${r._id}: Found ${scores.length} score records`);
+                  
+                  const metricsMap = {};
+                  scores.forEach(s => {
+                    metricsMap[s.metric] = s.value;
+                    console.log(`[Bulk] Metric: ${s.metric} = ${s.value}`);
+                  });
+                  
+                  const result = {
+                    ...r,
+                    type: 'wordlist',
+                    timestamp: r.endTs || r.timestamp || r.startTs,
+                    status: r.status || 'COMPLETED',
+                    metrics: metricsMap
+                  };
+                  console.log(`[Bulk] Returning wordlist with metrics:`, JSON.stringify(metricsMap));
+                  return result;
+                } catch (err) {
+                  console.error('Error fetching scores for test', r._id, err);
+                  return {
+                    ...r,
+                    type: 'wordlist',
+                    timestamp: r.endTs || r.timestamp || r.startTs,
+                    status: r.status || 'COMPLETED',
+                    metrics: {}
+                  };
+                }
+              }));
+              return testWithScores;
+            })
+            .catch(err => {
+              console.error('Error fetching wordlist:', err);
+              return [];
+            })
+        );
+        
+        // Add Stroop assessments
+        promises.push(
+          StroopAssessment.find({ userId })
+            .sort({ timestamp: -1 })
+            .limit(parseInt(limit))
+            .lean()
+            .then(results => {
+              console.log(`Found ${results.length} stroop assessments`);
+              return results.map(r => {
+                const metrics = {
+                  score: r.score || 0,
+                  total: r.total || 0,
+                  accuracy: r.accuracy || 0,
+                  history: r.history || []
+                };
+                console.log(`[Stroop] Metrics:`, JSON.stringify(metrics));
+                return {
+                  ...r,
+                  type: 'stroop',
+                  metrics: metrics
+                };
+              });
+            })
+            .catch(err => {
+              console.error('Error fetching stroop:', err);
+              return [];
+            })
+        );
+        
+        // Add neuro/hyperventilation (EpilepsyTest model)
+        promises.push(
+          EpilepsyTest.find({ 
+            $or: [
+              { userId },
+              { userId: new mongoose.Types.ObjectId(userId).toString ? new mongoose.Types.ObjectId(userId) : userId }
+            ]
+          })
+            .sort({ startedAt: -1 })
+            .limit(parseInt(limit))
+            .lean()
+            .then(results => {
+              console.log(`Found ${results.length} hyperventilation assessments`);
+              return results.map(r => {
+                const metrics = {
+                  baseline_hr: r.summaryMetrics?.baselineHR || 0,
+                  hv_hr: r.summaryMetrics?.hvHR || 0,
+                  recovery_hr: r.summaryMetrics?.recoveryHR || 0,
+                  hv_response: 'Normal'
+                };
+                console.log(`[Hyperventilation] Metrics:`, JSON.stringify(metrics));
+                return {
+                  ...r,
+                  type: 'hyperventilation',
+                  timestamp: r.endedAt || r.startedAt,
+                  status: r.status || 'completed',
+                  metrics: metrics
+                };
+              });
+            })
+            .catch(err => {
+              console.error('Error fetching hyperventilation:', err);
+              return [];
+            })
+        );
         
         // Wait for all queries to complete
         const results = await Promise.all(promises);
@@ -235,7 +462,7 @@ export const getAssessmentHistory = async (req, res) => {
         assessments = results
           .flat()
           .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-          .slice(0, limit);
+          .slice(0, parseInt(limit));
           
         console.log(`Found ${assessments.length} total assessments across all collections`);
       }
@@ -246,6 +473,12 @@ export const getAssessmentHistory = async (req, res) => {
       console.log('No assessments found, returning empty array');
       assessments = [];
     }
+
+    // Log what we're actually sending back
+    console.log(`[Assessment] Returning ${assessments.length} assessments to frontend`);
+    assessments.forEach((a, idx) => {
+      console.log(`[Assessment ${idx}] Type: ${a.type}, Has metrics: ${!!a.metrics}, Metrics keys:`, Object.keys(a.metrics || {}));
+    });
 
     res.json({
       success: true,

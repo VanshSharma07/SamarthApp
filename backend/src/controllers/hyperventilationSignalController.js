@@ -10,9 +10,8 @@ export async function ingestSignalData(req, res) {
     const docs = samples.map(s => ({
       testId: mongoose.Types.ObjectId(testId),
       timestamp: s.timestamp || Date.now(),
-      eeg: s.eeg || [],
-      ecg: s.ecg || [],
-      hr: typeof s.hr !== 'undefined' ? s.hr : undefined
+      eeg: s.eeg || []
+      // Only EEG data is stored; ECG and HR are ignored
     }));
 
     await SignalFrame.insertMany(docs);

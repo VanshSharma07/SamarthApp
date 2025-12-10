@@ -13,7 +13,8 @@ import {
   useMediaQuery,
   Tab,
   Tabs,
-  Paper
+  Paper,
+  Chip
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useState, useEffect } from 'react';
@@ -113,7 +114,12 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
       'gaitAnalysis': 'Gait Analysis Assessment',
       'fingerTapping': 'Finger Tapping Assessment',
       'facialSymmetry': 'Facial Symmetry Assessment',
-      'eyeMovement': 'Eye Movement Assessment'
+      'eyeMovement': 'Eye Movement Assessment',
+      'wordlist': 'Word List Memory Test',
+      'word_list': 'Word List Memory Test',
+      'stroop': 'Stroop Test',
+      'neuro': 'Neuro (EEG/ECG) Assessment',
+      'hyperventilation': 'Hyperventilation Response Test'
     };
     
     return typeMap[validatedAssessment.type] || validatedAssessment.type;
@@ -140,6 +146,15 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
         return renderFacialSymmetryMetrics();
       case 'eyeMovement':
         return renderEyeMovementMetrics();
+      case 'wordlist':
+      case 'word_list':
+        return renderWordListMetrics();
+      case 'stroop':
+        return renderStroopMetrics();
+      case 'neuro':
+        return renderNeuroMetrics();
+      case 'hyperventilation':
+        return renderHyperventilationMetrics();
       default:
         return (
           <Typography color="text.secondary">
@@ -558,6 +573,187 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
       )}
     </Grid>
   );
+
+  const renderWordListMetrics = () => (
+    <Grid container spacing={2}>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Immediate Recall %</Typography>
+        <Typography variant="h6">
+          {Number(validatedAssessment.metrics.immediate_percent || 0).toFixed(1)}%
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Immediate Total Correct</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.immediate_total_correct || 0}
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Delayed Recall</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.delayed_correct || 0}
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Retention %</Typography>
+        <Typography variant="h6">
+          {Number(validatedAssessment.metrics.retention_percent || 0).toFixed(1)}%
+        </Typography>
+      </Grid>
+      {validatedAssessment.metrics.per_trial_correct && 
+       Array.isArray(validatedAssessment.metrics.per_trial_correct) && (
+        <Grid item xs={12}>
+          <Typography variant="subtitle2">Per Trial Correct</Typography>
+          <Typography variant="body1">
+            {validatedAssessment.metrics.per_trial_correct.join(', ')}
+          </Typography>
+        </Grid>
+      )}
+    </Grid>
+  );
+
+  const renderStroopMetrics = () => (
+    <Grid container spacing={2}>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Accuracy</Typography>
+        <Typography variant="h6">
+          {Number((validatedAssessment.metrics.accuracy || 0) * 100).toFixed(1)}%
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Score</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.score || 0}/{validatedAssessment.metrics.total || 0}
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Reaction Time</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.reactionTime || 'N/A'}
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Test Status</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.status || 'COMPLETED'}
+        </Typography>
+      </Grid>
+      {validatedAssessment.metrics.history && 
+       Array.isArray(validatedAssessment.metrics.history) && 
+       validatedAssessment.metrics.history.length > 0 && (
+        <>
+          <Grid item xs={12}>
+            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Test History</Typography>
+          </Grid>
+          <Grid item xs={12}>
+            <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+              {validatedAssessment.metrics.history.map((trial, idx) => (
+                <Box key={idx} sx={{ mb: 1, p: 1, backgroundColor: trial.correct ? 'success.light' : 'error.light', borderRadius: 1 }}>
+                  <Typography variant="body2">
+                    Trial {idx + 1}: {trial.word} ({trial.ink}) → Selected: {trial.selected} 
+                    {trial.correct ? ' ✓' : ' ✗'}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Grid>
+        </>
+      )}
+    </Grid>
+  );
+
+  const renderNeuroMetrics = () => (
+    <Grid container spacing={2}>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Seizure Risk</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.seizure_risk || 'Low'}
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">EEG Abnormality</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.eeg_abnormality || 'Normal'}
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Seizure Duration</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.seizure_duration || 0}s
+        </Typography>
+      </Grid>
+      <Grid item xs={6} md={3}>
+        <Typography variant="subtitle2">Seizure Activity</Typography>
+        <Typography variant="h6">
+          {validatedAssessment.metrics.seizure_activity || 'None'}
+        </Typography>
+      </Grid>
+    </Grid>
+  );
+
+  const renderHyperventilationMetrics = () => {
+    const riskLevel = validatedAssessment.metrics.riskLevel || 'Unknown';
+    const baselineSpikes = Number(validatedAssessment.metrics.baselineSpikes) || 0;
+    const hvSpikes = Number(validatedAssessment.metrics.hyperventilationSpikes) || 0;
+    const recoverySpikes = Number(validatedAssessment.metrics.recoverySpikes) || 0;
+    const alphaSuppression = validatedAssessment.metrics.alphaSuppression || 0;
+    const deltaIncrease = validatedAssessment.metrics.deltaIncrease || 0;
+
+    return (
+      <Grid container spacing={2}>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">Risk Level</Typography>
+          <Chip
+            label={riskLevel.toUpperCase()}
+            color={riskLevel === 'high' ? 'error' : riskLevel === 'moderate' ? 'warning' : 'success'}
+            variant="outlined"
+          />
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">Screening Flag</Typography>
+          <Typography variant="h6">
+            {validatedAssessment.metrics.screeningFlag || 'N/A'}
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">Baseline Spikes</Typography>
+          <Typography variant="h6">
+            {baselineSpikes}
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">HV Spikes</Typography>
+          <Typography variant="h6">
+            {hvSpikes}
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">Recovery Spikes</Typography>
+          <Typography variant="h6">
+            {recoverySpikes}
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">Alpha Suppression</Typography>
+          <Typography variant="h6">
+            {alphaSuppression}%
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">Delta Increase</Typography>
+          <Typography variant="h6">
+            {deltaIncrease}%
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle2">Recommended Action</Typography>
+          <Typography variant="h6" sx={{ fontSize: '0.9rem' }}>
+            {validatedAssessment.metrics.recommendedAction || 'N/A'}
+          </Typography>
+        </Grid>
+      </Grid>
+    );
+  };
 
   const renderTremorCharts = () => {
     if (!validatedAssessment.metrics.rawData) {

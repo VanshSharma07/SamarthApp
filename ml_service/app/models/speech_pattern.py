@@ -55,12 +55,20 @@ class SpeechPatternAnalyzer:
             # Try loading with soundfile first
             try:
                 y, sr = sf.read(audio_data)
-                # Convert to mono if stereo
+                # Convert to stereo if mono
                 if len(y.shape) > 1:
                     y = np.mean(y, axis=1)
             except Exception as e:
                 logger.warning(f"SoundFile failed, falling back to librosa: {str(e)}")
                 y, sr = librosa.load(audio_data, sr=44100, mono=True)
+            
+            # Normalize audio to prevent clipping
+            max_val = np.max(np.abs(y))
+            if max_val > 0:
+                y = y / max_val
+            
+            # Apply noise reduction filter
+            y = librosa.effects.trim(y, top_db=40)[0]
             
             # Extract basic features
             pitch_features = self._analyze_pitch(y, sr)
@@ -68,24 +76,55 @@ class SpeechPatternAnalyzer:
             rhythm_features = self._analyze_rhythm(y, sr)
             fluency_features = self._analyze_fluency(y, sr)
             articulation_features = self._analyze_articulation(y, sr)
+            voice_features = self._analyze_voice_quality_librosa(y, sr)
             
-            # Calculate metrics
+            # Extract neurological indicators
+            neuro_indicators = self._analyze_neurological_indicators(
+                pitch_features, volume_features, rhythm_features, 
+                fluency_features, articulation_features, voice_features
+            )
+            
+            # Calculate disorder risk scores
+            disorder_risks = self._calculate_disorder_risk_scores(
+                pitch_features, volume_features, rhythm_features,
+                fluency_features, articulation_features, voice_features, neuro_indicators
+            )
+            
+            # Extract time series data for visualization
+            duration = len(y) / sr
+            time_series = self._extract_time_series_data(y, sr)
+            
+            # Calculate final metrics
+            metrics = self._calculate_metrics(
+                pitch_features, volume_features, rhythm_features,
+                fluency_features, articulation_features, voice_features,
+                neuro_indicators, disorder_risks, duration, time_series
+            )
+            
+            # Simplify metrics for frontend consumption
             metrics = {
-                'clarity': self._calculate_clarity(y, sr),
-                'speech_rate': rhythm_features['words_per_minute'],  # Changed from syllables_per_second * 60
-                'volume_control': volume_features['variation'],
-                'pitch_stability': pitch_features['stability'],
-                'articulation': {  # Add this section
-                    'precision': articulation_features['precision'],
-                    'vowel_formation': articulation_features['vowel_formation'],
-                    'consonant_precision': articulation_features['consonant_precision'],
-                    'slurred_speech': articulation_features['slurred_speech']
+                'clarity': metrics.get('clarity', {}).get('score', 0) / 100,
+                'speech_rate': metrics.get('speechRate', {}).get('wordsPerMinute', 0),
+                'volume_control': volume_features.get('variation', 0),
+                'pitch_stability': pitch_features.get('stability', 0),
+                'articulation': {
+                    'precision': articulation_features.get('precision', 0),
+                    'vowel_formation': articulation_features.get('vowel_formation', 0),
+                    'consonant_precision': articulation_features.get('consonant_precision', 0),
+                    'slurred_speech': articulation_features.get('slurred_speech', 0)
                 },
                 'emotion': {
                     'confidence': self._calculate_confidence_score(volume_features, pitch_features),
                     'hesitation': self._calculate_hesitation_score(fluency_features),
-                    'stress': self._calculate_stress_score(pitch_features, volume_features)
-                }
+                    'stress': self._calculate_stress_score(pitch_features, volume_features),
+                    'monotony': 1.0 - pitch_features.get('variability', 0)
+                },
+                'fluency': {
+                    'fluency_score': fluency_features.get('fluency_score', 0),
+                    'words_per_minute': fluency_features.get('words_per_minute', 0),
+                    'pause_rate': fluency_features.get('pause_rate', 0)
+                },
+                'timeSeries': time_series.get('emotion', {})
             }
             
             return {

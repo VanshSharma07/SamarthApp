@@ -18,7 +18,8 @@ const assessmentSchema = new mongoose.Schema({
       'TREMOR',
       'RESPONSE_TIME',
       'SPEECH_PATTERN',
-      'FINGER_TAPPING'
+      'FINGER_TAPPING',
+      'HYPERVENTILATION_TEST'
     ]
   },
   timestamp: {
