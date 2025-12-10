@@ -41,6 +41,7 @@
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.x.x",
+    "recharts": "^3.5.1",
     "recordrtc": "^5.6.2",
     "three": "^0.174.0",
     "vite-plugin-pwa": "^0.21.1",

@@ -86,7 +86,12 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
       'gaitAnalysis': 'Gait Analysis Assessment',
       'fingerTapping': 'Finger Tapping Assessment',
       'facialSymmetry': 'Facial Symmetry Assessment',
-      'eyeMovement': 'Eye Movement Assessment'
+      'eyeMovement': 'Eye Movement Assessment',
+      'wordlist': 'Word List Memory Test',
+      'word_list': 'Word List Memory Test',
+      'stroop': 'Stroop Test',
+      'neuro': 'Neuro (EEG/ECG) Assessment',
+      'hyperventilation': 'Hyperventilation Response Test'
     };
     
     return typeMap[processedAssessment.type] || processedAssessment.type;
@@ -160,6 +165,42 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
           label: 'Composite Score',
           value: formatScore(processedAssessment.metrics.overall?.compositeScore || 0)
         };
+      case 'wordlist':
+      case 'word_list': {
+        const immediatePercent = processedAssessment.metrics.immediate_percent !== undefined 
+                               ? processedAssessment.metrics.immediate_percent 
+                               : 0;
+        return {
+          label: 'Immediate Recall %',
+          value: `${Number(immediatePercent).toFixed(1)}%`
+        };
+      }
+      case 'stroop': {
+        const accuracy = processedAssessment.metrics.accuracy !== undefined
+                        ? (processedAssessment.metrics.accuracy * 100)
+                        : (processedAssessment.metrics.score && processedAssessment.metrics.total ? 
+                           (processedAssessment.metrics.score / processedAssessment.metrics.total * 100) : 0);
+        return {
+          label: 'Accuracy',
+          value: `${Number(accuracy).toFixed(1)}%`
+        };
+      }
+      case 'neuro': {
+        const seizureRisk = processedAssessment.metrics.seizure_risk !== undefined
+                          ? processedAssessment.metrics.seizure_risk 
+                          : 0;
+        return {
+          label: 'Seizure Risk',
+          value: formatScore(seizureRisk)
+        };
+      }
+      case 'hyperventilation': {
+        const riskLevel = processedAssessment.metrics.riskLevel || 'Unknown';
+        return {
+          label: 'Risk Level',
+          value: riskLevel.toUpperCase()
+        };
+      }
       default:
         return {
           label: 'Score',
@@ -282,6 +323,65 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
           { label: 'Velocity', value: formatScore(velocityScore) },
           { label: 'Accuracy', value: formatScore(accuracyScore) },
           { label: 'Smoothness', value: formatScore(smoothnessScore) }
+        ];
+      }
+      case 'wordlist':
+      case 'word_list': {
+        const immediateTotal = Number(processedAssessment.metrics.immediate_total_correct) || 0;
+        const delayedCorrect = Number(processedAssessment.metrics.delayed_correct) || 0;
+        const retentionPercent = Number(processedAssessment.metrics.retention_percent) || 0;
+        const perTrialCorrect = processedAssessment.metrics.per_trial_correct || [];
+        
+        let avgPerTrial = 0;
+        if (Array.isArray(perTrialCorrect) && perTrialCorrect.length > 0) {
+          const sum = perTrialCorrect.reduce((a, b) => (Number(a) || 0) + (Number(b) || 0), 0);
+          avgPerTrial = (sum / perTrialCorrect.length).toFixed(1);
+        }
+
+        return [
+          { label: 'Immediate Total', value: immediateTotal },
+          { label: 'Delayed Recall', value: delayedCorrect },
+          { label: 'Retention %', value: `${Number(retentionPercent).toFixed(1)}%` },
+          { label: 'Avg per Trial', value: avgPerTrial }
+        ];
+      }
+      case 'stroop': {
+        const score = Number(processedAssessment.metrics.score) || 0;
+        const total = Number(processedAssessment.metrics.total) || 0;
+        const reactionTime = processedAssessment.metrics.reactionTime || 'N/A';
+
+        return [
+          { label: 'Score', value: `${score}/${total}` },
+          { label: 'Avg Reaction Time', value: reactionTime },
+          { label: 'Test Status', value: processedAssessment.status || 'COMPLETED' }
+        ];
+      }
+      case 'neuro': {
+        const seizureDuration = Number(processedAssessment.metrics.seizure_duration) || 0;
+        const eegAbnormality = processedAssessment.metrics.eeg_abnormality || 'Normal';
+        const seizureActivity = processedAssessment.metrics.seizure_activity || 'None';
+
+        return [
+          { label: 'Duration', value: `${seizureDuration}s` },
+          { label: 'EEG Status', value: eegAbnormality },
+          { label: 'Seizure Activity', value: seizureActivity }
+        ];
+      }
+      case 'hyperventilation': {
+        const baselineSpikes = Number(processedAssessment.metrics.baselineSpikes) || 0;
+        const hvSpikes = Number(processedAssessment.metrics.hyperventilationSpikes) || 0;
+        const recoverySpikes = Number(processedAssessment.metrics.recoverySpikes) || 0;
+        const alphaSuppression = processedAssessment.metrics.alphaSuppression || 0;
+        const deltaIncrease = processedAssessment.metrics.deltaIncrease || 0;
+
+        return [
+          { label: 'Screening Flag', value: processedAssessment.metrics.screeningFlag || 'N/A' },
+          { label: 'Baseline Spikes', value: `${baselineSpikes}` },
+          { label: 'HV Spikes', value: `${hvSpikes}` },
+          { label: 'Recovery Spikes', value: `${recoverySpikes}` },
+          { label: 'Alpha Suppression', value: `${alphaSuppression}%` },
+          { label: 'Delta Increase', value: `${deltaIncrease}%` },
+          { label: 'Recommended Action', value: processedAssessment.metrics.recommendedAction || 'N/A' }
         ];
       }
       default:

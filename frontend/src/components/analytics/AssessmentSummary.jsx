@@ -798,6 +798,297 @@ const AssessmentSummary = ({ assessments, title }) => {
             </Paper>
           </Grid>
         )}
+
+        {/* Word List Memory Test Summary */}
+        {(groupedByType.wordlist || groupedByType.word_list) && (groupedByType.wordlist?.length > 0 || groupedByType.word_list?.length > 0) && (
+          <Grid item xs={12} md={cardSize}>
+            <Paper sx={{ p: paperPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Typography variant={cardTitleVariant} gutterBottom>
+                Word List Memory Test
+              </Typography>
+              <Divider sx={{ mb: isMobile ? 1 : 2 }} />
+              
+              <Grid container spacing={innerGridSpacing}>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Immediate Recall %
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.wordlist || groupedByType.word_list, a => `${(a.metrics.immediate_percent || 0).toFixed(1)}%`)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Immediate Total
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.wordlist || groupedByType.word_list, a => a.metrics.immediate_total_correct || 0)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Delayed Recall
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.wordlist || groupedByType.word_list, a => a.metrics.delayed_correct || 'N/A')}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Retention %
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.wordlist || groupedByType.word_list, a => `${(a.metrics.retention_percent || 0).toFixed(1)}%`)}
+                  </Typography>
+                </Grid>
+              </Grid>
+              
+              {((groupedByType.wordlist?.length || 0) + (groupedByType.word_list?.length || 0)) > 1 && (
+                <Box sx={{ ...chartContainerStyle, flexGrow: 1, mt: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
+                    <Tooltip title="Reset Zoom">
+                      <IconButton size="small" onClick={() => handleResetZoom('wordlist')}>
+                        <ZoomOut fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={expandedChart === 'wordlist' ? "Exit Fullscreen" : "Fullscreen"}>
+                      <IconButton size="small" onClick={() => toggleExpandChart('wordlist')}>
+                        <FullscreenExit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <LineChart 
+                    chartRef={(ref) => chartRefs.current['wordlist'] = ref}
+                    data={prepareChartData(
+                      groupedByType.wordlist || groupedByType.word_list, 
+                      a => a.metrics.immediate_percent
+                    )}
+                    options={chartOptions}
+                  />
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        )}
+
+        {/* Stroop Test Summary */}
+        {groupedByType.stroop && groupedByType.stroop.length > 0 && (
+          <Grid item xs={12} md={cardSize}>
+            <Paper sx={{ p: paperPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Typography variant={cardTitleVariant} gutterBottom>
+                Stroop Test
+              </Typography>
+              <Divider sx={{ mb: isMobile ? 1 : 2 }} />
+              
+              <Grid container spacing={innerGridSpacing}>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Accuracy
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.stroop, a => {
+                      const acc = a.metrics.accuracy || (a.metrics.score && a.metrics.total ? (a.metrics.score / a.metrics.total * 100) : 0);
+                      return `${acc.toFixed(1)}%`;
+                    })}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Score
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.stroop, a => `${a.metrics.score || 0}/${a.metrics.total || 0}`)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Test Status
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.stroop, a => a.status || 'COMPLETED')}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Total Trials
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.stroop, a => a.metrics.total || 0)}
+                  </Typography>
+                </Grid>
+              </Grid>
+              
+              {groupedByType.stroop.length > 1 && (
+                <Box sx={{ ...chartContainerStyle, flexGrow: 1, mt: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
+                    <Tooltip title="Reset Zoom">
+                      <IconButton size="small" onClick={() => handleResetZoom('stroop')}>
+                        <ZoomOut fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={expandedChart === 'stroop' ? "Exit Fullscreen" : "Fullscreen"}>
+                      <IconButton size="small" onClick={() => toggleExpandChart('stroop')}>
+                        <FullscreenExit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <LineChart 
+                    chartRef={(ref) => chartRefs.current['stroop'] = ref}
+                    data={prepareChartData(
+                      groupedByType.stroop, 
+                      a => a.metrics.accuracy || (a.metrics.score && a.metrics.total ? (a.metrics.score / a.metrics.total * 100) : 0)
+                    )}
+                    options={chartOptions}
+                  />
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        )}
+
+        {/* Neuro (EEG/ECG) Assessment Summary */}
+        {groupedByType.neuro && groupedByType.neuro.length > 0 && (
+          <Grid item xs={12} md={cardSize}>
+            <Paper sx={{ p: paperPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Typography variant={cardTitleVariant} gutterBottom>
+                Neuro (EEG/ECG) Assessment
+              </Typography>
+              <Divider sx={{ mb: isMobile ? 1 : 2 }} />
+              
+              <Grid container spacing={innerGridSpacing}>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Seizure Risk
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.neuro, a => `${(a.metrics.seizure_risk || 0).toFixed(1)}/100`)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    EEG Status
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.neuro, a => a.metrics.eeg_abnormality || 'Normal')}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Seizure Duration
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.neuro, a => `${a.metrics.seizure_duration || 0}s`)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Test Status
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.neuro, a => a.status || 'completed')}
+                  </Typography>
+                </Grid>
+              </Grid>
+              
+              {groupedByType.neuro.length > 1 && (
+                <Box sx={{ ...chartContainerStyle, flexGrow: 1, mt: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
+                    <Tooltip title="Reset Zoom">
+                      <IconButton size="small" onClick={() => handleResetZoom('neuro')}>
+                        <ZoomOut fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={expandedChart === 'neuro' ? "Exit Fullscreen" : "Fullscreen"}>
+                      <IconButton size="small" onClick={() => toggleExpandChart('neuro')}>
+                        <FullscreenExit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <LineChart 
+                    chartRef={(ref) => chartRefs.current['neuro'] = ref}
+                    data={prepareChartData(
+                      groupedByType.neuro, 
+                      a => a.metrics.seizure_risk
+                    )}
+                    options={chartOptions}
+                  />
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        )}
+
+        {/* Hyperventilation Response Test Summary */}
+        {groupedByType.hyperventilation && groupedByType.hyperventilation.length > 0 && (
+          <Grid item xs={12} md={cardSize}>
+            <Paper sx={{ p: paperPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Typography variant={cardTitleVariant} gutterBottom>
+                Hyperventilation Response Test
+              </Typography>
+              <Divider sx={{ mb: isMobile ? 1 : 2 }} />
+              
+              <Grid container spacing={innerGridSpacing}>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Baseline HR
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.hyperventilation, a => `${a.metrics.baseline_hr || a.metrics.baselineHR || 0} bpm`)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    HV HR
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.hyperventilation, a => `${a.metrics.hv_hr || a.metrics.hvHR || 0} bpm`)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    Recovery HR
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.hyperventilation, a => `${a.metrics.recovery_hr || a.metrics.recoveryHR || 0} bpm`)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant={labelVariant} color="text.secondary">
+                    HV Response
+                  </Typography>
+                  <Typography variant={valueVariant}>
+                    {getMostRecentValue(groupedByType.hyperventilation, a => a.metrics.hv_response || a.metrics.hvResponse || 'Normal')}
+                  </Typography>
+                </Grid>
+              </Grid>
+              
+              {groupedByType.hyperventilation.length > 1 && (
+                <Box sx={{ ...chartContainerStyle, flexGrow: 1, mt: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
+                    <Tooltip title="Reset Zoom">
+                      <IconButton size="small" onClick={() => handleResetZoom('hyperventilation')}>
+                        <ZoomOut fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={expandedChart === 'hyperventilation' ? "Exit Fullscreen" : "Fullscreen"}>
+                      <IconButton size="small" onClick={() => toggleExpandChart('hyperventilation')}>
+                        <FullscreenExit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <LineChart 
+                    chartRef={(ref) => chartRefs.current['hyperventilation'] = ref}
+                    data={prepareChartData(
+                      groupedByType.hyperventilation, 
+                      a => a.metrics.baseline_hr || a.metrics.baselineHR
+                    )}
+                    options={chartOptions}
+                  />
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );

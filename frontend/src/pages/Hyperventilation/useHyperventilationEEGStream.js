@@ -20,9 +20,10 @@ export default function useHyperventilationEEGStream(testId) {
     };
   }, []);
 
-  const connect = () => {
+  const connect = (overrideTestId) => {
     if (wsRef.current) wsRef.current.close();
-    const ws = new WebSocket(WS_URL + (testId ? `?testId=${testId}` : ''));
+    const idToUse = overrideTestId || testId;
+    const ws = new WebSocket(WS_URL + (idToUse ? `?testId=${idToUse}` : ''));
     wsRef.current = ws;
     ws.onopen = () => setConnected(true);
     ws.onclose = () => setConnected(false);

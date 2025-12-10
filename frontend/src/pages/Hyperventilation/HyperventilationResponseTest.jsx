@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Button, Typography, Paper, CircularProgress } from '@mui/material';
 import HyperventilationSignalGraph from './HyperventilationSignalGraph';
+import HyperventilationCautionModal from './HyperventilationCautionModal';
+import HyperventilationTestResults from './HyperventilationTestResults';
 import useHyperventilationEEGStream from './useHyperventilationEEGStream';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
@@ -8,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const DEFAULT_PHASES = [
   { name: 'baseline', min: 60, max: 120, default: 60 },
-  { name: 'hyperventilation', min: 120, max: 180, default: 120 },
+  { name: 'hyperventilation', min: 60, max: 120, default: 60 },
   { name: 'recovery', min: 60, max: 120, default: 60 }
 ];
 
@@ -19,7 +21,10 @@ const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {
   const [timers, setTimers] = useState(DEFAULT_PHASES.map(p => p.default));
   const [countdown, setCountdown] = useState(0);
   const [runningPhase, setRunningPhase] = useState(false);
-  const { eegData, ecgData, hr, bands, spikeDetected, connected, connect, disconnect } = useHyperventilationEEGStream(testId);
+  const [showCaution, setShowCaution] = useState(false);
+  const [testResults, setTestResults] = useState(null);
+  const [loadingResults, setLoadingResults] = useState(false);
+  const { eegData, bands, spikeDetected, connected, connect, disconnect } = useHyperventilationEEGStream(testId); // Only EEG
   const [creating, setCreating] = useState(false);
 
   ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
@@ -47,6 +52,7 @@ const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {
   const createTest = async () => {
     try {
       setCreating(true);
+      setShowCaution(false); // Close modal after agreement
       const actualUserId = propUserId || (user && user.id) || undefined;
       const resp = await fetch('/api/tests/hyperventilation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: actualUserId }) });
       const text = await resp.text();
@@ -63,8 +69,8 @@ const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {
 
       if (json && json.testId) {
         setTestId(json.testId);
-        // connect ws after test created
-        connect();
+        // connect ws after test created with explicit testId to avoid stale state
+        connect(json.testId);
         setPhaseIndex(0);
       } else {
         console.warn('start test returned no testId', json, text);
@@ -93,22 +99,49 @@ const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {
 
   const stopTest = async () => {
     try {
-      await fetch('/api/tests/hyperventilation/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId }) });
-    } catch (e) { console.error(e); }
-    setRunningPhase(false);
-    setPhaseIndex(3);
-    disconnect();
+      setLoadingResults(true);
+      const resp = await fetch('/api/tests/hyperventilation/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId }) });
+      const json = await resp.json();
+      console.log('Complete test response:', { status: resp.status, ok: resp.ok, json });
+      
+      if (resp.ok && json.summary) {
+        console.log('Setting test results:', json.summary);
+        setTestResults(json.summary);
+      } else if (resp.ok && json.success === false) {
+        console.error('Test completion failed:', json.message, json.debug);
+        alert(`Test completion failed: ${json.message}\n\nPlease check:\n- WebSocket connection was active\n- All phases were completed\n- Data was being captured\n\nDebug info: ${JSON.stringify(json.debug || {})}`);
+        setTestResults(null);
+      } else {
+        console.error('Unexpected response format or error:', json);
+        alert('Failed to complete test. The server response was unexpected. Please try again or contact support.');
+        setTestResults(null);
+      }
+    } catch (e) { 
+      console.error('stopTest error:', e); 
+      alert('An error occurred while completing the test: ' + e.message);
+      setTestResults(null);
+    } finally {
+      setLoadingResults(false);
+      setRunningPhase(false);
+      setPhaseIndex(3);
+      disconnect();
+    }
   };
 
   return (
     <Box>
+      <HyperventilationCautionModal
+        open={showCaution}
+        onProceed={createTest}
+        onCancel={() => setShowCaution(false)}
+      />
       <Paper sx={{ p: 2 }}>
         {phaseIndex === -1 && (
           <Box>
             <Typography variant="h5">Hyperventilation Response Test</Typography>
-            <Typography sx={{ mt: 1 }}>This test records EEG and ECG through three phases to observe any provoked abnormalities. This is not a diagnostic test.</Typography>
+            <Typography sx={{ mt: 1 }}>This test records EEG through three phases to observe any provoked abnormalities. This is not a diagnostic test.</Typography>
             <Typography sx={{ mt: 1, color: 'error.main' }}>Safety: Stop immediately if you feel dizzy, faint, or unwell.</Typography>
-            <Button variant="contained" sx={{ mt: 2 }} onClick={createTest}>Start Test</Button>
+            <Button variant="contained" sx={{ mt: 2 }} onClick={() => setShowCaution(true)}>Start Test</Button>
           </Box>
         )}
 
@@ -125,7 +158,7 @@ const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {
 
             <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'flex-start' }}>
               <Box sx={{ flex: 1 }}>
-                <HyperventilationSignalGraph eegData={eegData} ecgData={ecgData} hr={hr} connected={connected} />
+                <HyperventilationSignalGraph eegData={eegData} connected={connected} />
               </Box>
 
               <Paper sx={{ width: 320, p: 2 }}>
@@ -133,13 +166,7 @@ const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {
                 <div style={{ height: 160 }}>
                   <Bar data={bandsChartData} options={{ plugins: { legend: { display: false } }, maintainAspectRatio: false }} />
                 </div>
-
                 <Box sx={{ mt: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <Paper sx={{ p: 1, flex: 1 }}>
-                    <Typography variant="subtitle2">Heart Rate</Typography>
-                    <Typography variant="h5">{hr || '--'}</Typography>
-                  </Paper>
-
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="subtitle2">Spike</Typography>
                     <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: spikeDetected ? 'red' : 'grey.400', boxShadow: spikeDetected ? '0 0 8px red' : 'none', transition: 'all 200ms' }} />
@@ -161,14 +188,19 @@ const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {
 
         {phaseIndex === 3 && (
           <Box>
-            <Typography variant="h6">Test Complete</Typography>
-            <Typography>Summary:</Typography>
-            <ul>
-              <li>Baseline: {timers[0]}s</li>
-              <li>Hyperventilation: {timers[1]}s</li>
-              <li>Recovery: {timers[2]}s</li>
-            </ul>
-            <Button variant="contained" onClick={() => window.print()}>Download Report (PDF)</Button>
+            {loadingResults ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <CircularProgress />
+                <Typography>Processing your test results...</Typography>
+              </Box>
+            ) : testResults ? (
+              <HyperventilationTestResults summary={testResults} testId={testId} />
+            ) : (
+              <Box>
+                <Typography variant="h6">Test Complete</Typography>
+                <Typography sx={{ mt: 2 }}>Results are being processed. Please wait.</Typography>
+              </Box>
+            )}
           </Box>
         )}
       </Paper>
