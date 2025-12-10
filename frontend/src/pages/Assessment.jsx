@@ -46,6 +46,7 @@ import WordListAssessment from '../components/assessments/WordList/WordListAsses
 import NeuroAssessment from './NeuroAssessment';
 import HyperventilationResponseTest from './Hyperventilation/HyperventilationResponseTest';
 import StroopTest from '../components/assessments/AlzehmierStrooptest/StroopTest';
+import BotScreen from '../conversationalBot/pages/BotScreen';
 
 // Styled Motion components
 const MotionCard = motion(Card);
@@ -213,6 +214,15 @@ const Assessment = () => {
       component: StroopTest,
       route: '/assessment/stroop',
       color: '#1976d2'
+    },
+    {
+      id: 'conversationalBot',
+      title: 'Conversational Screening',
+      description: 'AI-assisted verbal screening for cognitive assessment (Multilingual).',
+      icon: MicIcon,
+      component: BotScreen,
+      route: '/assessment/bot',
+      color: '#009688' // Teal
     }
   ];
   // Map disorders to relevant assessment IDs (based on your table)
@@ -235,7 +245,8 @@ const Assessment = () => {
       'responseTime',
       'speechPattern',
       'wordList',
-      'stroop'
+      'stroop',
+      'conversationalBot'
     ]
   };
 

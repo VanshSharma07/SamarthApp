@@ -10,6 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.27.0",
     "@google/generative-ai": "^0.22.0",
     "@sendgrid/mail": "^8.1.4",
     "axios": "^1.4.0",
@@ -33,6 +34,7 @@
     "passport-google-oauth20": "^2.0.0",
     "pdfkit": "^0.16.0",
     "serialport": "^11.0.0",
+    "uuid": "^13.0.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
