@@ -16,6 +16,8 @@ import diagnosticRoutes from './routes/diagnosticRoutes.js';
 import apiRoutes from './routes/api.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { startSimulator } from './services/neuroSimulator.js';
+import neuroBotRoutes from './routes/neuroBot.routes.js';
+
 // Wordlist processing now runs in-process via `services/wordlistWorker.js`
 
 // Initialize environment variables
@@ -84,6 +86,8 @@ app.use('/api/specialized-assessments', specializedAssessmentRoutes);
 app.use('/api', apiRoutes);
 // Diagnostic routes (keep after main API routes)
 app.use('/api', diagnosticRoutes);
+// NeuroBot routes
+app.use('/api/neurobot', neuroBotRoutes);  
 
 // 404 Middleware (Handles unknown routes)
 app.use((req, res, next) => {
