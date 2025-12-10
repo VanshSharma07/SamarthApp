@@ -6,7 +6,8 @@ import {
   isAgeAnswerHeuristic,
   validateAnswer,
   generateConversationalMessage,
-  textToSpeech
+  textToSpeech,
+  generateMedicalReport
 } from "../services/neuroBot.service.js";
 
 import { v4 as uuidv4 } from "uuid";
@@ -16,6 +17,7 @@ import { Blob } from "buffer";
 
 const upload = multer();
 const sessions = {};
+const ELEVEN_KEY = process.env.ELEVEN_API_KEY;
 
 export const startSession = async (req, res) => {
   const sessionId = uuidv4();
@@ -150,7 +152,7 @@ export const processAnswer = async (req, res) => {
     // 5. NEXT QUESTION
     const nextQ = QUESTIONS[lang][nextIndex];
 
-    const botText = await generateNextMessage(
+    const botText = await generateConversationalMessage(
       currentQ.text,
       answer,
       nextQ.text,
@@ -202,14 +204,26 @@ export const processSTT = [
 // =====================
 // REPORT
 // =====================
-export const generateReport = (req, res) => {
+// =====================
+// REPORT
+// =====================
+
+export const generateReport = async (req, res) => {
   const { sessionId } = req.body;
   const session = sessions[sessionId];
 
   if (!session) return res.status(400).json({ error: "Session not found" });
 
-  res.json({
-    answers: session.answers,
-    history: session.history
-  });
+  try {
+      const report = await generateMedicalReport(session.answers, session.lang);
+      
+      res.json({
+        answers: session.answers,
+        history: session.history,
+        report // Include the generated report
+      });
+  } catch (err) {
+      console.error("Report Error:", err);
+      res.status(500).json({ error: "Failed to generate report" });
+  }
 };

@@ -14,8 +14,19 @@ const ELEVEN_VOICE_HI = process.env.ELEVEN_VOICE_HI;
 // 1. DETECT LANGUAGE
 // =========================
 export function detectLanguage(text) {
+  if (!text) return "en";
   const lower = text.toLowerCase();
-  if (lower === "hindi" || lower === "hi" || /[ऀ-ॿ]/.test(text)) return "hi";
+  // Check for "Hindi", "Hi", or Devanagari script or Gujarati/Bengali etc commonly used in India
+  // Added \u0900-\u0D7F covering Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu, Kannada, Malayalam
+  if (
+    lower.includes("hindi") || 
+    lower.includes("hndi") || 
+    lower.includes("india") ||
+    lower === "hi" || 
+    /[\u0900-\u0D7F]/.test(text) 
+  ) {
+    return "hi";
+  }
   return "en";
 }
 
@@ -139,8 +150,15 @@ QUESTION: "${question}"
 USER ANSWER: "${userAnswer}"
 LANGUAGE: ${lang}
 
+IMPORTANT:
+- The user might reply in **Hinglish** (Hindi in English script) e.g. "han", "haan", "ha" = Yes, "nahi", "na" = No.
+- The user might reply in **Devanagari** transliteration of English words (e.g. "ट्वेंटी टू" = Twenty Two).
+- The user might answer in a MIX of English and Hindi.
+- IF the answer contains a valid number or age (even if written in Hindi script like "पच्चीस" or "ट्वेंटी"), accept it.
+- Accept these as RELEVANT answers.
+
 Respond with ONLY:
-YES → if answer is relevant
+YES → if answer is relevant (confirms age, yes/no, or explains)
 NO → if answer is irrelevant or evasive
 `;
 
@@ -207,4 +225,55 @@ export async function textToSpeech(text, lang) {
   );
 
   return `data:audio/mpeg;base64,${Buffer.from(response.data).toString("base64")}`;
+}
+
+// =========================
+// 9. GENERATE MEDICAL REPORT
+// =========================
+export async function generateMedicalReport(answers, lang) {
+  const prompt = `
+You are a neurological expert AI.
+Generate a "Patient Friendly Report" based on the screening answers below.
+
+LANGUAGE: ${lang}
+
+ANSWERS:
+${JSON.stringify(answers, null, 2)}
+
+INSTRUCTIONS:
+1. **Summary**: Brief explanation of the patient's status.
+2. **Risk Assessment**: High, Medium, or Low risk of potential neurological issues (Alzheimer's/Parkinson's context).
+3. **Recommendations**: Simple advice (e.g., consult a neurologist, sleep better, manage stress).
+4. **Tone**: Empathetic, professional, and clear. Avoid overly medical jargon.
+5. **Output**: Return ONLY a valid JSON object.
+
+JSON FORMAT:
+{
+  "summary": "...",
+  "riskLevel": "Low" | "Medium" | "High",
+  "reasoning": "...",
+  "recommendations": ["...", "..."]
+}
+`;
+
+  const response = await axios.post(
+    WORKER_URL,
+    { messages: [{ role: "user", content: prompt }] },
+    { headers: { "x-api-key": WORKER_KEY } }
+  );
+
+  try {
+      const text = extractLLMResponse(response.data);
+      // Clean up potential markdown code blocks
+      const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(jsonStr);
+  } catch (e) {
+      console.error("Report Generation Failed:", e);
+      return {
+          summary: "Could not generate report at this time.",
+          riskLevel: "Unknown",
+          reasoning: "Analysis failed.",
+          recommendations: ["Please consult a doctor directly."]
+      };
+  }
 }
