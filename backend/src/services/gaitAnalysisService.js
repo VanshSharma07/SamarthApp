@@ -160,3 +160,40 @@ function validateNumericValues(obj, path = '') {
     }
   }
 }
+
+// New functions to compute basic gait metrics from raw sensor data
+export function computeBasicGaitMetrics(sensorData) {
+  const metrics = {
+    gait: {},
+    stability: {},
+    balance: {},
+    symmetry: {}
+  };
+
+  // Compute gait metrics
+  if (sensorData.accelerometer && sensorData.gyroscope) {
+    const { accelerometer, gyroscope } = sensorData;
+    
+    // Example calculations, these should be replaced with real algorithms
+    metrics.gait.speed = Math.sqrt( Math.pow(accelerometer.x, 2) + Math.pow(accelerometer.y, 2) + Math.pow(accelerometer.z, 2) );
+    metrics.gait.strideLength = Math.abs(gyroscope.y) * 0.5; // Just an example, not accurate
+  }
+
+  // Compute stability and balance metrics
+  if (sensorData.gyroscope) {
+    const { gyroscope } = sensorData;
+    
+    metrics.stability.score = Math.abs(gyroscope.x) + Math.abs(gyroscope.z);
+    metrics.balance.score = Math.abs(gyroscope.y);
+  }
+
+  // Compute symmetry metrics
+  if (sensorData.leftLegData && sensorData.rightLegData) {
+    const { leftLegData, rightLegData } = sensorData;
+    
+    metrics.symmetry.legSymmetry = 100 - Math.abs(leftLegData.speed - rightLegData.speed) * 10;
+    metrics.symmetry.armSymmetry = 100 - Math.abs(leftLegData.swingAngle - rightLegData.swingAngle) * 10;
+  }
+
+  return metrics;
+}

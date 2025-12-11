@@ -1,4 +1,5 @@
 import { gaitAnalysisService } from '../services/gaitAnalysisService.js';
+import WebSocket from 'ws';
 
 export const gaitAnalysisController = {
   async save(req, res) {
@@ -99,5 +100,39 @@ export const gaitAnalysisController = {
         error: error.message
       });
     }
+  },
+
+  initWebSocket(server) {
+    const wss = new WebSocket.Server({ server });
+
+    wss.on('connection', (ws) => {
+      console.log('New WebSocket connection established');
+
+      ws.on('message', async (message) => {
+        console.log('Received message from client:', message);
+
+        try {
+          const sensorData = JSON.parse(message);
+
+          // Here you can process the sensor data as needed
+          console.log('Processed sensor data:', sensorData);
+
+          // For example, save the sensor data to the database
+          // await gaitAnalysisService.saveSensorData(sensorData);
+
+          // Send a response back to the client
+          ws.send(JSON.stringify({ success: true, receivedData: sensorData }));
+        } catch (error) {
+          console.error('Error processing message:', error);
+          ws.send(JSON.stringify({ success: false, error: 'Invalid data format' }));
+        }
+      });
+
+      ws.on('close', () => {
+        console.log('WebSocket connection closed');
+      });
+    });
+
+    console.log('WebSocket server initialized');
   }
 };

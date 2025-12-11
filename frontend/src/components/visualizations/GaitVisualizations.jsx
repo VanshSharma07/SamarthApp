@@ -502,4 +502,23 @@ export const JointAnglesTimeline = ({ data }) => {
       <Line ref={chartRef} data={chartData} options={options} />
     </Box>
   );
-}; 
+};
+
+export const LiveSensorValues = ({ sensorData }) => {
+  // Assuming sensorData is an object with keys as sensor names and values as their current readings
+  return (
+    <Box sx={{ p: 2, border: '1px solid #eee', borderRadius: 1, mb: 2 }}>
+      <Typography variant="h6" gutterBottom>Live Sensor Values</Typography>
+      {Object.entries(sensorData).length === 0 ? (
+        <Typography>No sensor data available</Typography>
+      ) : (
+        Object.entries(sensorData).map(([sensor, value]) => (
+          <Box key={sensor} sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
+            <Typography variant="body1">{sensor}</Typography>
+            <Typography variant="body1" sx={{ fontWeight: 'medium' }}>{value}</Typography>
+          </Box>
+        ))
+      )}
+    </Box>
+  );
+};

@@ -85,6 +85,22 @@ const GaitAnalysis = ({ userId, onComplete }) => {
   const metricsAnalyzer = useRef(new GaitMetricsAnalyzer());
   const { currentUser } = useAuth();
   const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [ws, setWs] = useState(null);
+  const [sensorData, setSensorData] = useState({
+    deviceId: null,
+    connected: false,
+    leftFoot: {
+      fsr: { sensor1: 0, sensor2: 0, sensor3: 0, sensor4: 0, sensor5: 0, sensor6: 0 }
+    },
+    rightFoot: {
+      fsr: { sensor1: 0, sensor2: 0, sensor3: 0, sensor4: 0, sensor5: 0, sensor6: 0 }
+    },
+    imu: {
+      accel: { x: 0, y: 0, z: 0 },
+      gyro: { x: 0, y: 0, z: 0 }
+    },
+    timestamp: null
+  });
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -95,7 +111,11 @@ const GaitAnalysis = ({ userId, onComplete }) => {
     if (analysisRef.current && streamRef.current) {
       stopGaitAnalysis();
     }
-  }, []);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.close();
+      setWs(null);
+    }
+  }, [ws]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -112,6 +132,44 @@ const GaitAnalysis = ({ userId, onComplete }) => {
         clearTimeout(timeoutRef.current);
       }
       stopGaitAnalysis();
+    };
+  }, []);
+
+  // Connect to WebSocket server
+  useEffect(() => {
+    const websocket = new WebSocket('ws://localhost:5000/ws/sensors');
+
+    websocket.onopen = () => {
+      console.log('✅ WebSocket connected to /ws/sensors');
+      setSensorData(prev => ({ ...prev, connected: true }));
+    };
+
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📊 Sensor data received:', data);
+        handleSensorData(data);
+      } catch (error) {
+        console.error('Error parsing sensor data:', error);
+      }
+    };
+
+    websocket.onclose = () => {
+      console.log('❌ WebSocket disconnected');
+      setSensorData(prev => ({ ...prev, connected: false }));
+    };
+
+    websocket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setSensorData(prev => ({ ...prev, connected: false }));
+    };
+
+    setWs(websocket);
+
+    return () => {
+      if (websocket.readyState === WebSocket.OPEN) {
+        websocket.close();
+      }
     };
   }, []);
 
@@ -430,6 +488,127 @@ const GaitAnalysis = ({ userId, onComplete }) => {
     return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   };
 
+  // Sensor Dashboard Component
+  const renderSensorDashboard = () => (
+    <Paper sx={{ p: 2, mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h6">
+          ESP32 Insole Sensors
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box
+            sx={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              bgcolor: sensorData.connected ? 'success.main' : 'error.main',
+              mr: 1
+            }}
+          />
+          <Typography variant="body2" color="text.secondary">
+            {sensorData.connected ? 'Connected' : 'Disconnected'}
+          </Typography>
+          {sensorData.deviceId && (
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              ({sensorData.deviceId})
+            </Typography>
+          )}
+        </Box>
+      </Box>
+      
+      <Grid container spacing={2}>
+        {/* Left Foot FSR Sensors */}
+        <Grid item xs={12} md={6}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" gutterBottom color="primary">
+              Left Foot FSR Sensors
+            </Typography>
+            <Grid container spacing={1}>
+              {Object.entries(sensorData.leftFoot.fsr).map(([key, value]) => (
+                <Grid item xs={4} key={`left-${key}`}>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {key.replace('sensor', 'FSR ')}
+                    </Typography>
+                    <Typography variant="h6">{value}</Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Paper>
+        </Grid>
+
+        {/* Right Foot FSR Sensors */}
+        <Grid item xs={12} md={6}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" gutterBottom color="primary">
+              Right Foot FSR Sensors
+            </Typography>
+            <Grid container spacing={1}>
+              {Object.entries(sensorData.rightFoot.fsr).map(([key, value]) => (
+                <Grid item xs={4} key={`right-${key}`}>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {key.replace('sensor', 'FSR ')}
+                    </Typography>
+                    <Typography variant="h6">{value}</Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Paper>
+        </Grid>
+
+        {/* IMU Sensors */}
+        <Grid item xs={12}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" gutterBottom color="primary">
+              IMU Sensors
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Accelerometer (m/s²)
+                  </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={4}>
+                      <Typography variant="body2">X: {sensorData.imu.accel.x.toFixed(2)}</Typography>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Typography variant="body2">Y: {sensorData.imu.accel.y.toFixed(2)}</Typography>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Typography variant="body2">Z: {sensorData.imu.accel.z.toFixed(2)}</Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Gyroscope (°/s)
+                  </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={4}>
+                      <Typography variant="body2">X: {sensorData.imu.gyro.x.toFixed(2)}</Typography>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Typography variant="body2">Y: {sensorData.imu.gyro.y.toFixed(2)}</Typography>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Typography variant="body2">Z: {sensorData.imu.gyro.z.toFixed(2)}</Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+
   const handleError = (error) => {
     setError(error.message);
     setIsRecording(false);
@@ -554,6 +733,19 @@ const GaitAnalysis = ({ userId, onComplete }) => {
     );
   };
 
+  // Handle incoming sensor data from WebSocket
+  const handleSensorData = (data) => {
+    // Update sensor data state for display
+    setSensorData(prevData => ({
+      deviceId: data.deviceId,
+      connected: true,
+      leftFoot: data.leftFoot || prevData.leftFoot,
+      rightFoot: data.rightFoot || prevData.rightFoot,
+      imu: data.imu || prevData.imu,
+      timestamp: data.timestamp || Date.now()
+    }));
+  };
+
   return (
     <AssessmentLayout
       title="Gait Analysis"
@@ -649,6 +841,9 @@ const GaitAnalysis = ({ userId, onComplete }) => {
             </Paper>
           </Grid>
         </Grid>
+
+        {/* Sensor Dashboard */}
+        {renderSensorDashboard()}
 
         {renderEnhancedVisualizations()}
         {renderMetrics()}

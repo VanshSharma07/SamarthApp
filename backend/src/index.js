@@ -17,6 +17,7 @@ import apiRoutes from './routes/api.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { startSimulator } from './services/neuroSimulator.js';
 import neuroBotRoutes from './routes/neuroBot.routes.js';
+import { gaitAnalysisController } from './controllers/gaitAnalysisController.js';
 
 // Wordlist processing now runs in-process via `services/wordlistWorker.js`
 
@@ -27,6 +28,41 @@ const app = express();
 
 // attach express-ws so routers can define websocket endpoints (keeps integration minimal)
 expressWs(app);
+
+// Store WebSocket clients for sensor data broadcasting
+const sensorClients = new Set();
+
+// WebSocket route for sensor data streaming
+app.ws('/ws/sensors', (ws, req) => {
+  console.log('✅ Sensor WebSocket client connected');
+  sensorClients.add(ws);
+  
+  ws.on('message', (msg) => {
+    try {
+      const data = JSON.parse(msg);
+      console.log('📊 Received sensor data from:', data.deviceId || 'unknown');
+      
+      // Broadcast to all connected clients
+      sensorClients.forEach(client => {
+        if (client.readyState === 1) { // OPEN
+          client.send(JSON.stringify(data));
+        }
+      });
+    } catch (error) {
+      console.error('Error processing sensor data:', error);
+    }
+  });
+  
+  ws.on('close', () => {
+    console.log('❌ Sensor WebSocket client disconnected');
+    sensorClients.delete(ws);
+  });
+  
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    sensorClients.delete(ws);
+  });
+});
 
 // Register neuro WS route now that express-ws has been attached
 registerNeuroWs(app);
@@ -142,6 +178,7 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/samarth")
     
     app.listen(PORT, HOST, () => {
       console.log(`Server is running on ${HOST}:${PORT}`);
+      console.log('✅ WebSocket /ws/sensors endpoint ready for gait sensor streaming');
       console.log('\n📡 Available network interfaces for ESP32:');
       addresses.forEach(addr => console.log(`  ✓ ${addr}`));
       console.log('\n⚠️  Update ESP32 firmware ws_host to one of the above IPs\n');
