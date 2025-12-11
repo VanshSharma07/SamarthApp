@@ -1,24 +1,36 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import {
+  normalizeAssessmentType,
+  DISORDER_CONFIG,
+  getAllDisorders
+} from '../config/disorderAssessmentMapping.js';
 
 dotenv.config();
-// Use the provided API key
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const API_BASE_URL = process.env.GEMINI_API_BASE_URL;
-const MODEL = 'gemini-2.0-flash'; // Use the free tier Gemini model
+// Use the LLM Worker API from environment variables
+const LLM_API_URL = process.env.LLM_API_URL;
+const LLM_API_KEY = process.env.LLM_API_KEY;
 
 // Helper function to transform assessment data into the expected format
 function transformAssessmentsData(assessments) {
-  // Initialize the transformed data structure with all 8 assessment types
+  // Initialize the transformed data structure with all assessment types from config
   const transformedData = {
-    tremor: null,
-    speech: null,
-    responseTime: null,
-    facialSymmetry: null,
-    fingerTapping: null,
+    // Parkinson's assessments
     eyeMovement: null,
+    tremor: null,
+    responseTime: null,
     gaitAnalysis: null,
-    neckMobility: null
+    fingerTapping: null,
+    speechPattern: null,
+    
+    // Alzheimer's assessments
+    wordList: null,
+    stroop: null,
+    conversationalScreening: null,
+    
+    // Epilepsy assessments
+    neuro: null,
+    hyperventilation: null
   };
   
   console.log(`Processing ${assessments.length} assessments for AI analysis`);
@@ -30,58 +42,26 @@ function transformAssessmentsData(assessments) {
       return;
     }
     
-    // Map the database assessment type to our internal type
-    let mappedType;
-    const assessmentType = assessment.type ? assessment.type.toUpperCase() : '';
+    // Normalize the assessment type using the new mapping
+    const normalizedType = normalizeAssessmentType(assessment.type);
     
-    switch(assessmentType) {
-      case 'TREMOR':
-        mappedType = 'tremor';
-        break;
-      case 'SPEECH_PATTERN':
-      case 'SPEECHPATTERN':
-        mappedType = 'speech';
-        break;
-      case 'RESPONSE_TIME':
-      case 'RESPONSETIME':
-        mappedType = 'responseTime';
-        break;
-      case 'FACIAL_SYMMETRY':
-      case 'FACIALSYMMETRY':
-        mappedType = 'facialSymmetry';
-        break;
-      case 'FINGER_TAPPING':
-      case 'FINGERTAPPING':
-        mappedType = 'fingerTapping';
-        break;
-      case 'EYE_MOVEMENT':
-      case 'EYEMOVEMENT':
-        mappedType = 'eyeMovement';
-        break;
-      case 'GAIT_ANALYSIS':
-      case 'GAITANALYSIS':
-        mappedType = 'gaitAnalysis';
-        break;
-      case 'NECK_MOBILITY':
-      case 'NECKMOBILITY':
-        mappedType = 'neckMobility';
-        break;
-      default:
-        console.log(`Unknown assessment type: ${assessment.type}`);
-        return;
+    if (!normalizedType) {
+      console.log(`Unknown or unmapped assessment type: ${assessment.type}`);
+      return;
     }
     
     // Take the most recent assessment of each type (if there are multiple)
-    if (!transformedData[mappedType] || 
-        new Date(assessment.timestamp) > new Date(transformedData[mappedType].timestamp)) {
+    if (!transformedData[normalizedType] || 
+        new Date(assessment.timestamp) > new Date(transformedData[normalizedType].timestamp)) {
       
-      console.log(`Using ${mappedType} assessment from ${assessment.timestamp}`);
+      console.log(`Using ${normalizedType} assessment from ${assessment.timestamp}`);
       
       // Store the transformed assessment with proper handling for nested data
-      transformedData[mappedType] = {
+      transformedData[normalizedType] = {
+        type: assessment.type,
         timestamp: assessment.timestamp,
         metrics: assessment.metrics,
-        // Also include neurological_indicators if present for facialSymmetry
+        // Include any additional data that might be relevant
         neurological_indicators: assessment.neurological_indicators || 
                                 assessment.metrics?.neurological_indicators
       };
@@ -122,8 +102,8 @@ export const getAiAnalysisResults = async (assessments) => {
         hasMetrics: !!transformedData.facialSymmetry.metrics,
         hasNeurologicalIndicators: !!(transformedData.facialSymmetry.neurological_indicators || 
                                      transformedData.facialSymmetry.metrics?.neurological_indicators),
-        bellsPalsyData: transformedData.facialSymmetry.neurological_indicators?.bells_palsy || 
-                        transformedData.facialSymmetry.metrics?.neurological_indicators?.bells_palsy || 'Not Available'
+        symmetryData: transformedData.facialSymmetry.neurological_indicators?.asymmetry_score || 
+                      transformedData.facialSymmetry.metrics?.neurological_indicators?.asymmetry_score || 'Not Available'
       });
     } else {
       console.log('No facial symmetry data available for AI analysis');
@@ -134,33 +114,69 @@ export const getAiAnalysisResults = async (assessments) => {
     // Create a comprehensive prompt for the AI model
     const prompt = createAiPrompt(transformedData);
     
-    console.log('Making API call to Gemini for comprehensive analysis');
+    console.log('Making API call to LLM Worker API for comprehensive analysis');
     console.log('Prompt length:', prompt.length);
     
-    // Make API call to Gemini
+    // Make API call to LLM Worker API
     const response = await axios.post(
-      `${API_BASE_URL}/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      LLM_API_URL,
       {
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.2,
-          topP: 0.8,
-          topK: 40,
-          maxOutputTokens: 1024,
-          responseMimeType: "application/json"
-        }
+        messages: [
+          { role: "system", content: prompt }
+        ]
       },
       {
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': LLM_API_KEY
+        },
+        timeout: 60000,
+        maxRedirects: 5
       }
     );
     
-    console.log('Gemini API response received with status:', response.status);
+    console.log('LLM API response received with status:', response.status);
+    console.log('Response data structure:', JSON.stringify(response.data).substring(0, 300));
     
-    // Extract text from response
-    const text = response.data.candidates[0].content.parts[0].text;
+    // Extract text from response - handle multiple possible response formats
+    let text;
+    if (response.data.output) {
+      // LLM Worker API format
+      text = response.data.output;
+    } else if (response.data.choices && response.data.choices[0]) {
+      // OpenAI format
+      text = response.data.choices[0].message?.content || response.data.choices[0].text;
+    } else if (response.data.content) {
+      text = response.data.content;
+    } else if (response.data.result) {
+      text = response.data.result;
+    } else if (typeof response.data === 'string') {
+      text = response.data;
+    } else {
+      console.error('Unexpected response format:', JSON.stringify(response.data).substring(0, 500));
+      throw new Error('Unexpected API response format');
+    }
+    
+    if (!text) {
+      console.error('Failed to extract text from response');
+      throw new Error('No content in API response');
+    }
+    
+    // If response contains markdown code blocks, extract the JSON
+    if (text.includes('```json')) {
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        text = jsonMatch[1];
+        console.log('Extracted JSON from markdown code block');
+      }
+    } else if (text.includes('```')) {
+      const jsonMatch = text.match(/```\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        text = jsonMatch[1];
+        console.log('Extracted JSON from code block');
+      }
+    }
+    
     console.log('Response text length:', text.length);
     console.log('Sample response:', text.substring(0, 200).replace(/\n/g, '\\n'));
     
@@ -190,13 +206,13 @@ export const getAiAnalysisResults = async (assessments) => {
         indicators: ["Unable to analyze due to an error"],
         recommendations: ["Consult with a healthcare professional"] 
       },
-      bellsPalsy: { 
+      alzheimersDisease: { 
         riskLevel: "unknown", 
         confidence: 0,
         indicators: ["Unable to analyze due to an error"],
         recommendations: ["Consult with a healthcare professional"] 
       },
-      als: { 
+      epilepsy: { 
         riskLevel: "unknown", 
         confidence: 0,
         indicators: ["Unable to analyze due to an error"],
@@ -221,35 +237,70 @@ export const getAiPrediction = async (assessmentData) => {
     // Format assessment data for AI analysis
     const prompt = createAiPrompt(assessmentData);
     
-    console.log('Making API call to Gemini with prompt length:', prompt.length);
-    console.log('API endpoint:', `${API_BASE_URL}/models/${MODEL}:generateContent`);
+    console.log('Making API call to LLM Worker API with prompt length:', prompt.length);
+    console.log('API endpoint:', LLM_API_URL);
     
-    // Make a real API call to Gemini API
+    // Make a real API call to LLM Worker API
     const response = await axios.post(
-      `${API_BASE_URL}/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      LLM_API_URL,
       {
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.2, // Lower temperature for more consistent results
-          topP: 0.8,
-          topK: 40,
-          maxOutputTokens: 1024,
-        }
+        messages: [
+          { role: "system", content: prompt }
+        ]
       },
       {
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'x-api-key': LLM_API_KEY
+        },
+        timeout: 60000,
+        maxRedirects: 5
       }
     );
     
-    console.log('Gemini API response received with status:', response.status);
+    console.log('LLM API response received with status:', response.status);
+    console.log('Response data structure:', JSON.stringify(response.data).substring(0, 300));
     
-    // Extract the text from the response
-    const text = response.data.candidates[0].content.parts[0].text;
-    console.log('Successfully extracted text from Gemini response, length:', text.length);
+    // Extract the text from the response - handle multiple possible response formats
+    let text;
+    if (response.data.output) {
+      // LLM Worker API format
+      text = response.data.output;
+    } else if (response.data.choices && response.data.choices[0]) {
+      // OpenAI format
+      text = response.data.choices[0].message?.content || response.data.choices[0].text;
+    } else if (response.data.content) {
+      text = response.data.content;
+    } else if (response.data.result) {
+      text = response.data.result;
+    } else if (typeof response.data === 'string') {
+      text = response.data;
+    } else {
+      console.error('Unexpected response format:', JSON.stringify(response.data).substring(0, 500));
+      throw new Error('Unexpected API response format');
+    }
+    
+    if (!text) {
+      console.error('Failed to extract text from response');
+      throw new Error('No content in API response');
+    }
+    
+    // If response contains markdown code blocks, extract the JSON
+    if (text.includes('```json')) {
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        text = jsonMatch[1];
+        console.log('Extracted JSON from markdown code block');
+      }
+    } else if (text.includes('```')) {
+      const jsonMatch = text.match(/```\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        text = jsonMatch[1];
+        console.log('Extracted JSON from code block');
+      }
+    }
+    
+    console.log('Successfully extracted text from LLM API response, length:', text.length);
     
     // Log a snippet of the response for debugging
     console.log('Response snippet (first 100 chars):', text.substring(0, 100));
@@ -277,7 +328,7 @@ export const getAiPrediction = async (assessmentData) => {
 
 // Helper function to create a prompt for the AI model
 function createAiPrompt(assessmentData) {
-  let prompt = `Analyze the following patient's neuromotor assessment data and provide an analysis of potential neurological disorders. Focus on identifying signs of Parkinson's disease, Bell's Palsy, and ALS.
+  let prompt = `Analyze the following patient's neurological assessment data and provide an analysis of potential neurological disorders. Focus on identifying signs of Parkinson's disease, Alzheimer's disease, and Epilepsy.
 
 For each potential disorder, provide:
 1. A risk score (low, moderate, or high)
@@ -286,98 +337,8 @@ For each potential disorder, provide:
 
 Here is the patient's assessment data:\n\n`;
 
-  // Add tremor data if available
-  if (assessmentData.tremor) {
-    prompt += `TREMOR ASSESSMENT (Date: ${new Date(assessmentData.tremor.timestamp).toLocaleDateString()}):
-- Frequency: ${assessmentData.tremor.metrics?.tremor_frequency || assessmentData.tremor.metrics?.frequency || 'N/A'} Hz
-- Amplitude: ${assessmentData.tremor.metrics?.tremor_amplitude || assessmentData.tremor.metrics?.amplitude || 'N/A'}
-- Type: ${assessmentData.tremor.metrics?.tremor_type || assessmentData.tremor.metrics?.type || 'N/A'}
-- Severity: ${assessmentData.tremor.metrics?.severity || 'N/A'}
-- Overall Tremor Score: ${assessmentData.tremor.metrics?.overall?.tremorScore || assessmentData.tremor.metrics?.overallScore || 'N/A'}/10
-
-`;
-  } else {
-    prompt += `TREMOR ASSESSMENT: No data available\n\n`;
-  }
-
-  // Add speech pattern data if available
-  if (assessmentData.speech) {
-    prompt += `SPEECH PATTERN ASSESSMENT (Date: ${new Date(assessmentData.speech.timestamp).toLocaleDateString()}):
-- Clarity: ${assessmentData.speech.metrics?.clarity?.score || assessmentData.speech.metrics?.clarity || 'N/A'}/10
-- Speech Rate: ${assessmentData.speech.metrics?.speechRate?.wordsPerMinute || assessmentData.speech.metrics?.speechRate || 'N/A'} words per minute
-- Volume Control: ${assessmentData.speech.metrics?.volumeControl?.score || assessmentData.speech.metrics?.volumeControl || 'N/A'}/10
-- Overall Score: ${assessmentData.speech.metrics?.overallScore || assessmentData.speech.metrics?.overallQuality || 'N/A'}/10
-${assessmentData.speech.metrics?.emotion ? `
-- Confidence: ${assessmentData.speech.metrics.emotion.confidence || 'N/A'}/10
-- Hesitation: ${assessmentData.speech.metrics.emotion.hesitation || 'N/A'}/10
-- Stress: ${assessmentData.speech.metrics.emotion.stress || 'N/A'}/10
-- Monotony: ${assessmentData.speech.metrics.emotion.monotony || 'N/A'}/10\n` : ''}
-
-`;
-  } else {
-    prompt += `SPEECH PATTERN ASSESSMENT: No data available\n\n`;
-  }
-
-  // Add response time data if available
-  if (assessmentData.responseTime) {
-    prompt += `RESPONSE TIME ASSESSMENT (Date: ${new Date(assessmentData.responseTime.timestamp).toLocaleDateString()}):
-- Average Response Time: ${assessmentData.responseTime.metrics?.averageResponseTime || 'N/A'} ms
-- Fastest Response: ${assessmentData.responseTime.metrics?.fastestResponse || 'N/A'} ms
-- Slowest Response: ${assessmentData.responseTime.metrics?.slowestResponse || 'N/A'} ms
-- Accuracy: ${assessmentData.responseTime.metrics?.accuracy || 'N/A'}/10
-- Response Score: ${assessmentData.responseTime.metrics?.overall?.responseScore || 'N/A'}/10
-
-`;
-  } else {
-    prompt += `RESPONSE TIME ASSESSMENT: No data available\n\n`;
-  }
-  
-  // Add facial symmetry data if available
-  if (assessmentData.facialSymmetry) {
-    prompt += `FACIAL SYMMETRY ASSESSMENT (Date: ${new Date(assessmentData.facialSymmetry.timestamp).toLocaleDateString()}):
-- Symmetry Score: ${assessmentData.facialSymmetry.metrics?.symmetryScore || assessmentData.facialSymmetry.metrics?.symmetry_score || 'N/A'}/100
-- Eye Symmetry: ${assessmentData.facialSymmetry.metrics?.eye_symmetry || assessmentData.facialSymmetry.metrics?.eyeSymmetry || 'N/A'}/10
-- Mouth Symmetry: ${assessmentData.facialSymmetry.metrics?.mouth_symmetry || assessmentData.facialSymmetry.metrics?.mouthSymmetry || 'N/A'}/10
-- Jaw Symmetry: ${assessmentData.facialSymmetry.metrics?.jaw_symmetry || assessmentData.facialSymmetry.metrics?.jawSymmetry || 'N/A'}/10
-- Face Tilt: ${assessmentData.facialSymmetry.metrics?.face_tilt || assessmentData.facialSymmetry.metrics?.faceTilt || 'N/A'} degrees
-`;
-
-    // Add neurological indicators if available
-    if (assessmentData.facialSymmetry.metrics?.neurological_indicators || 
-        assessmentData.facialSymmetry.neurological_indicators) {
-      
-      const indicators = assessmentData.facialSymmetry.metrics?.neurological_indicators || 
-                        assessmentData.facialSymmetry.neurological_indicators;
-      
-      prompt += `
-- Bell's Palsy Risk: ${indicators?.bells_palsy?.risk || 'Unknown'}
-- Bell's Palsy Score: ${indicators?.bells_palsy?.score || 'N/A'}
-- Stroke Risk: ${indicators?.stroke?.risk || 'Unknown'}
-- Parkinson's Risk: ${indicators?.parkinsons?.risk || 'Unknown'}
-- Overall Neurological Risk: ${indicators?.overall?.risk || 'Unknown'}
-`;
-    }
-
-    prompt += `\n`;
-  } else {
-    prompt += `FACIAL SYMMETRY ASSESSMENT: No data available\n\n`;
-  }
-
-  // Add finger tapping data if available
-  if (assessmentData.fingerTapping) {
-    prompt += `FINGER TAPPING ASSESSMENT (Date: ${new Date(assessmentData.fingerTapping.timestamp).toLocaleDateString()}):
-- Frequency: ${assessmentData.fingerTapping.metrics?.frequency || assessmentData.fingerTapping.metrics?.tapsPerSecond || 'N/A'} taps/second
-- Amplitude: ${assessmentData.fingerTapping.metrics?.amplitude || 'N/A'}
-- Rhythm: ${assessmentData.fingerTapping.metrics?.rhythm || assessmentData.fingerTapping.metrics?.rhythmScore || 'N/A'}/10
-- Accuracy: ${assessmentData.fingerTapping.metrics?.accuracy || 'N/A'}/10
-- Overall Score: ${assessmentData.fingerTapping.metrics?.overallScore || 'N/A'}/10
-
-`;
-  } else {
-    prompt += `FINGER TAPPING ASSESSMENT: No data available\n\n`;
-  }
-
-  // Add eye movement data if available
+  // ===== PARKINSON'S ASSESSMENTS =====
+  // Eye Movement Assessment
   if (assessmentData.eyeMovement) {
     prompt += `EYE MOVEMENT ASSESSMENT (Date: ${new Date(assessmentData.eyeMovement.timestamp).toLocaleDateString()}):
 - Tracking Accuracy: ${assessmentData.eyeMovement.metrics?.accuracy || assessmentData.eyeMovement.metrics?.trackingAccuracy || 'N/A'}/10
@@ -391,7 +352,35 @@ ${assessmentData.speech.metrics?.emotion ? `
     prompt += `EYE MOVEMENT ASSESSMENT: No data available\n\n`;
   }
 
-  // Add gait analysis data if available
+  // Tremor Assessment (Parkinson's specific)
+  if (assessmentData.tremor) {
+    prompt += `TREMOR ASSESSMENT (Date: ${new Date(assessmentData.tremor.timestamp).toLocaleDateString()}):
+- Frequency: ${assessmentData.tremor.metrics?.tremor_frequency || assessmentData.tremor.metrics?.frequency || 'N/A'} Hz
+- Amplitude: ${assessmentData.tremor.metrics?.tremor_amplitude || assessmentData.tremor.metrics?.amplitude || 'N/A'}
+- Type: ${assessmentData.tremor.metrics?.tremor_type || assessmentData.tremor.metrics?.type || 'N/A'}
+- Severity: ${assessmentData.tremor.metrics?.severity || 'N/A'}
+- Overall Tremor Score: ${assessmentData.tremor.metrics?.overall?.tremorScore || assessmentData.tremor.metrics?.overallScore || 'N/A'}/10
+
+`;
+  } else {
+    prompt += `TREMOR ASSESSMENT: No data available\n\n`;
+  }
+
+  // Response Time Assessment (Parkinson's & Alzheimer's)
+  if (assessmentData.responseTime) {
+    prompt += `RESPONSE TIME ASSESSMENT (Date: ${new Date(assessmentData.responseTime.timestamp).toLocaleDateString()}):
+- Average Response Time: ${assessmentData.responseTime.metrics?.averageResponseTime || 'N/A'} ms
+- Fastest Response: ${assessmentData.responseTime.metrics?.fastestResponse || 'N/A'} ms
+- Slowest Response: ${assessmentData.responseTime.metrics?.slowestResponse || 'N/A'} ms
+- Accuracy: ${assessmentData.responseTime.metrics?.accuracy || 'N/A'}/10
+- Response Score: ${assessmentData.responseTime.metrics?.overall?.responseScore || 'N/A'}/10
+
+`;
+  } else {
+    prompt += `RESPONSE TIME ASSESSMENT: No data available\n\n`;
+  }
+
+  // Gait Analysis Assessment (Parkinson's & Alzheimer's)
   if (assessmentData.gaitAnalysis) {
     prompt += `GAIT ANALYSIS ASSESSMENT (Date: ${new Date(assessmentData.gaitAnalysis.timestamp).toLocaleDateString()}):
 - Stability: ${assessmentData.gaitAnalysis.metrics?.stability || 'N/A'}/10
@@ -399,6 +388,7 @@ ${assessmentData.speech.metrics?.emotion ? `
 - Symmetry: ${assessmentData.gaitAnalysis.metrics?.symmetry || 'N/A'}/10
 - Step Length: ${assessmentData.gaitAnalysis.metrics?.stepLength || 'N/A'} cm
 - Walking Speed: ${assessmentData.gaitAnalysis.metrics?.walkingSpeed || 'N/A'} m/s
+- Cadence: ${assessmentData.gaitAnalysis.metrics?.cadence || 'N/A'} steps/min
 - Overall Score: ${assessmentData.gaitAnalysis.metrics?.overallScore || 'N/A'}/10
 
 `;
@@ -406,19 +396,114 @@ ${assessmentData.speech.metrics?.emotion ? `
     prompt += `GAIT ANALYSIS ASSESSMENT: No data available\n\n`;
   }
 
-  // Add neck mobility data if available
-  if (assessmentData.neckMobility) {
-    prompt += `NECK MOBILITY ASSESSMENT (Date: ${new Date(assessmentData.neckMobility.timestamp).toLocaleDateString()}):
-- Flexion: ${assessmentData.neckMobility.metrics?.flexion || 'N/A'} degrees
-- Extension: ${assessmentData.neckMobility.metrics?.extension || 'N/A'} degrees
-- Lateral Rotation: ${assessmentData.neckMobility.metrics?.lateralRotation || assessmentData.neckMobility.metrics?.rotation || 'N/A'} degrees
-- Lateral Bending: ${assessmentData.neckMobility.metrics?.lateralBending || 'N/A'} degrees
-- Range of Motion: ${assessmentData.neckMobility.metrics?.rangeOfMotion || 'N/A'}/10
-- Overall Score: ${assessmentData.neckMobility.metrics?.overallScore || 'N/A'}/10
+  // Finger Tapping Assessment (Parkinson's specific)
+  if (assessmentData.fingerTapping) {
+    prompt += `FINGER TAPPING ASSESSMENT (Date: ${new Date(assessmentData.fingerTapping.timestamp).toLocaleDateString()}):
+- Frequency: ${assessmentData.fingerTapping.metrics?.frequency || assessmentData.fingerTapping.metrics?.tapsPerSecond || 'N/A'} taps/second
+- Amplitude: ${assessmentData.fingerTapping.metrics?.amplitude || 'N/A'}
+- Rhythm: ${assessmentData.fingerTapping.metrics?.rhythm || assessmentData.fingerTapping.metrics?.rhythmScore || 'N/A'}/10
+- Accuracy: ${assessmentData.fingerTapping.metrics?.accuracy || 'N/A'}/10
+- Consistency: ${assessmentData.fingerTapping.metrics?.consistency || 'N/A'}/10
+- Overall Score: ${assessmentData.fingerTapping.metrics?.overallScore || 'N/A'}/10
 
 `;
   } else {
-    prompt += `NECK MOBILITY ASSESSMENT: No data available\n\n`;
+    prompt += `FINGER TAPPING ASSESSMENT: No data available\n\n`;
+  }
+
+  // Speech Pattern Assessment (Parkinson's & Alzheimer's)
+  if (assessmentData.speechPattern) {
+    prompt += `SPEECH PATTERN ASSESSMENT (Date: ${new Date(assessmentData.speechPattern.timestamp).toLocaleDateString()}):
+- Clarity: ${assessmentData.speechPattern.metrics?.clarity?.score || assessmentData.speechPattern.metrics?.clarity || 'N/A'}/10
+- Speech Rate: ${assessmentData.speechPattern.metrics?.speechRate?.wordsPerMinute || assessmentData.speechPattern.metrics?.speechRate || 'N/A'} words per minute
+- Volume Control: ${assessmentData.speechPattern.metrics?.volumeControl?.score || assessmentData.speechPattern.metrics?.volumeControl || 'N/A'}/10
+- Overall Score: ${assessmentData.speechPattern.metrics?.overallScore || assessmentData.speechPattern.metrics?.overallQuality || 'N/A'}/10
+${assessmentData.speechPattern.metrics?.emotion ? `
+- Confidence: ${assessmentData.speechPattern.metrics.emotion.confidence || 'N/A'}/10
+- Hesitation: ${assessmentData.speechPattern.metrics.emotion.hesitation || 'N/A'}/10
+- Stress: ${assessmentData.speechPattern.metrics.emotion.stress || 'N/A'}/10
+- Monotony: ${assessmentData.speechPattern.metrics.emotion.monotony || 'N/A'}/10\n` : ''}
+
+`;
+  } else {
+    prompt += `SPEECH PATTERN ASSESSMENT: No data available\n\n`;
+  }
+
+  // ===== ALZHEIMER'S SPECIFIC ASSESSMENTS =====
+  // Word List Memory Test
+  if (assessmentData.wordList) {
+    prompt += `WORD LIST MEMORY TEST (Date: ${new Date(assessmentData.wordList.timestamp).toLocaleDateString()}):
+- Immediate Recall: ${assessmentData.wordList.metrics?.immediateRecall || 'N/A'}/10
+- Delayed Recall: ${assessmentData.wordList.metrics?.delayedRecall || 'N/A'}/10
+- Recognition: ${assessmentData.wordList.metrics?.recognition || 'N/A'}/10
+- Learning Index: ${assessmentData.wordList.metrics?.learningIndex || 'N/A'}/10
+- Forgetting Rate: ${assessmentData.wordList.metrics?.forgettingRate || 'N/A'}/10
+- Overall Memory Score: ${assessmentData.wordList.metrics?.overallScore || 'N/A'}/10
+
+`;
+  } else {
+    prompt += `WORD LIST MEMORY TEST: No data available\n\n`;
+  }
+
+  // Stroop Test (Alzheimer's specific)
+  if (assessmentData.stroop) {
+    prompt += `STROOP TEST (Date: ${new Date(assessmentData.stroop.timestamp).toLocaleDateString()}):
+- Word Reading Time: ${assessmentData.stroop.metrics?.wordReadingTime || 'N/A'} seconds
+- Color Naming Time: ${assessmentData.stroop.metrics?.colorNamingTime || 'N/A'} seconds
+- Stroop Interference Time: ${assessmentData.stroop.metrics?.stroopInterferenceTime || 'N/A'} seconds
+- Accuracy: ${assessmentData.stroop.metrics?.accuracy || 'N/A'}/10
+- Interference Effect: ${assessmentData.stroop.metrics?.interferenceEffect || 'N/A'}/10
+- Executive Function Score: ${assessmentData.stroop.metrics?.overallScore || 'N/A'}/10
+
+`;
+  } else {
+    prompt += `STROOP TEST: No data available\n\n`;
+  }
+
+  // Conversational Screening (Alzheimer's specific)
+  if (assessmentData.conversationalScreening) {
+    prompt += `CONVERSATIONAL SCREENING (Date: ${new Date(assessmentData.conversationalScreening.timestamp).toLocaleDateString()}):
+- Vocabulary: ${assessmentData.conversationalScreening.metrics?.vocabulary || 'N/A'}/10
+- Coherence: ${assessmentData.conversationalScreening.metrics?.coherence || 'N/A'}/10
+- Topic Maintenance: ${assessmentData.conversationalScreening.metrics?.topicMaintenance || 'N/A'}/10
+- Language Fluency: ${assessmentData.conversationalScreening.metrics?.fluency || 'N/A'}/10
+- Comprehension: ${assessmentData.conversationalScreening.metrics?.comprehension || 'N/A'}/10
+- Overall Cognitive Screen: ${assessmentData.conversationalScreening.metrics?.overallScore || 'N/A'}/10
+
+`;
+  } else {
+    prompt += `CONVERSATIONAL SCREENING: No data available\n\n`;
+  }
+
+  // ===== EPILEPSY SPECIFIC ASSESSMENTS =====
+  // Neuro (EEG/ECG) Assessment
+  if (assessmentData.neuro) {
+    prompt += `NEURO (EEG/ECG) ASSESSMENT (Date: ${new Date(assessmentData.neuro.timestamp).toLocaleDateString()}):
+- EEG Abnormality Detection: ${assessmentData.neuro.metrics?.eegAbnormality || 'N/A'}/10
+- Spike Detection: ${assessmentData.neuro.metrics?.spikeDetection || 'N/A'}/10
+- Seizure Activity: ${assessmentData.neuro.metrics?.seizureActivity || 'N/A'}/10
+- ECG Regularity: ${assessmentData.neuro.metrics?.ecgRegularity || 'N/A'}/10
+- Heart Rate Variability: ${assessmentData.neuro.metrics?.heartRateVariability || 'N/A'} bpm
+- Overall Neuro Score: ${assessmentData.neuro.metrics?.overallScore || 'N/A'}/10
+
+`;
+  } else {
+    prompt += `NEURO (EEG/ECG) ASSESSMENT: No data available\n\n`;
+  }
+
+  // Hyperventilation Response Test (Epilepsy specific)
+  if (assessmentData.hyperventilation) {
+    prompt += `HYPERVENTILATION RESPONSE TEST (Date: ${new Date(assessmentData.hyperventilation.timestamp).toLocaleDateString()}):
+- Baseline Heart Rate: ${assessmentData.hyperventilation.metrics?.baselineHeartRate || 'N/A'} bpm
+- Peak Heart Rate During HV: ${assessmentData.hyperventilation.metrics?.peakHeartRate || 'N/A'} bpm
+- Heart Rate Recovery: ${assessmentData.hyperventilation.metrics?.heartRateRecovery || 'N/A'} bpm
+- Seizure Provocation: ${assessmentData.hyperventilation.metrics?.seizureProvocation || 'N/A'}/10
+- EEG Changes: ${assessmentData.hyperventilation.metrics?.eegChanges || 'N/A'}/10
+- Overall HV Response: ${assessmentData.hyperventilation.metrics?.overallScore || 'N/A'}/10
+
+`;
+  } else {
+    prompt += `HYPERVENTILATION RESPONSE TEST: No data available\n\n`;
   }
 
   // Add specific JSON formatting instruction
@@ -428,19 +513,19 @@ ${assessmentData.speech.metrics?.emotion ? `
   "parkinsonsDisease": {
     "riskLevel": "low|moderate|high",
     "confidence": 0-100,
-    "indicators": ["indicator 1", "indicator 2"],
+    "indicators": ["indicator 1", "indicator 2", "indicator 3"],
     "recommendations": ["recommendation 1", "recommendation 2"]
   },
-  "bellsPalsy": {
+  "alzheimersDisease": {
     "riskLevel": "low|moderate|high",
     "confidence": 0-100,
-    "indicators": ["indicator 1", "indicator 2"],
+    "indicators": ["indicator 1", "indicator 2", "indicator 3"],
     "recommendations": ["recommendation 1", "recommendation 2"]
   },
-  "als": {
+  "epilepsy": {
     "riskLevel": "low|moderate|high",
     "confidence": 0-100,
-    "indicators": ["indicator 1", "indicator 2"],
+    "indicators": ["indicator 1", "indicator 2", "indicator 3"],
     "recommendations": ["recommendation 1", "recommendation 2"]
   },
   "overallAssessment": "Your overall assessment summary based on all provided assessments",
@@ -493,22 +578,25 @@ function parseAiResponse(text) {
     console.warn('Could not extract JSON from AI response, using fallback format');
     console.log('First 500 chars of response:', text.substring(0, 500));
     
-    // If all attempts fail, return a basic structure
+    // If all attempts fail, return a basic structure with new disorders
     return {
       parkinsonsDisease: { 
         riskLevel: extractRiskLevel(text, "parkinson"),
+        confidence: 0,
         indicators: extractBulletPoints(text, "parkinson", "indicator"), 
         recommendations: extractBulletPoints(text, "parkinson", "recommend")
       },
-      bellsPalsy: { 
-        riskLevel: extractRiskLevel(text, "bell"),
-        indicators: extractBulletPoints(text, "bell", "indicator"), 
-        recommendations: extractBulletPoints(text, "bell", "recommend")
+      alzheimersDisease: { 
+        riskLevel: extractRiskLevel(text, "alzheimer"),
+        confidence: 0,
+        indicators: extractBulletPoints(text, "alzheimer", "indicator"), 
+        recommendations: extractBulletPoints(text, "alzheimer", "recommend")
       },
-      als: { 
-        riskLevel: extractRiskLevel(text, "als"),
-        indicators: extractBulletPoints(text, "als", "indicator"), 
-        recommendations: extractBulletPoints(text, "als", "recommend")  
+      epilepsy: { 
+        riskLevel: extractRiskLevel(text, "epilepsy"),
+        confidence: 0,
+        indicators: extractBulletPoints(text, "epilepsy", "indicator"), 
+        recommendations: extractBulletPoints(text, "epilepsy", "recommend")  
       },
       overallAssessment: extractOverallAssessment(text),
       disclaimerNote: "This is an automated AI analysis and should not replace professional medical diagnosis."
@@ -527,8 +615,8 @@ function reconstructJsonFromText(text) {
   try {
     const result = {
       parkinsonsDisease: { riskLevel: "unknown", indicators: [], recommendations: [] },
-      bellsPalsy: { riskLevel: "unknown", indicators: [], recommendations: [] },
-      als: { riskLevel: "unknown", indicators: [], recommendations: [] },
+      alzheimersDisease: { riskLevel: "unknown", indicators: [], recommendations: [] },
+      epilepsy: { riskLevel: "unknown", indicators: [], recommendations: [] },
       overallAssessment: "",
       disclaimerNote: "This is an automated AI analysis and should not replace professional medical diagnosis."
     };
@@ -545,27 +633,27 @@ function reconstructJsonFromText(text) {
       }
     }
 
-    // Extract Bell's Palsy section
-    const bellsPalsyMatch = text.match(/bell['s]* palsy[^]*?risk[^]*?(low|moderate|high)/i);
-    if (bellsPalsyMatch) {
-      result.bellsPalsy.riskLevel = bellsPalsyMatch[1].toLowerCase();
+    // Extract Alzheimer's Disease section
+    const alzheimersMatch = text.match(/alzheimer['s]* disease[^]*?risk[^]*?(low|moderate|high)/i);
+    if (alzheimersMatch) {
+      result.alzheimersDisease.riskLevel = alzheimersMatch[1].toLowerCase();
       
       // Extract confidence
-      const confidenceMatch = text.match(/bell['s]* palsy[^]*?confidence:?\s*(\d+)/i);
+      const confidenceMatch = text.match(/alzheimer['s]* disease[^]*?confidence:?\s*(\d+)/i);
       if (confidenceMatch) {
-        result.bellsPalsy.confidence = parseInt(confidenceMatch[1]);
+        result.alzheimersDisease.confidence = parseInt(confidenceMatch[1]);
       }
     }
 
-    // Extract ALS section
-    const alsMatch = text.match(/als[^]*?risk[^]*?(low|moderate|high)/i);
-    if (alsMatch) {
-      result.als.riskLevel = alsMatch[1].toLowerCase();
+    // Extract Epilepsy section
+    const epilepsyMatch = text.match(/epilepsy[^]*?risk[^]*?(low|moderate|high)/i);
+    if (epilepsyMatch) {
+      result.epilepsy.riskLevel = epilepsyMatch[1].toLowerCase();
       
       // Extract confidence
-      const confidenceMatch = text.match(/als[^]*?confidence:?\s*(\d+)/i);
+      const confidenceMatch = text.match(/epilepsy[^]*?confidence:?\s*(\d+)/i);
       if (confidenceMatch) {
-        result.als.confidence = parseInt(confidenceMatch[1]);
+        result.epilepsy.confidence = parseInt(confidenceMatch[1]);
       }
     }
 
@@ -578,10 +666,10 @@ function reconstructJsonFromText(text) {
     // Extract indicators and recommendations using separate function
     result.parkinsonsDisease.indicators = extractBulletPoints(text, "parkinson", "indicator");
     result.parkinsonsDisease.recommendations = extractBulletPoints(text, "parkinson", "recommend");
-    result.bellsPalsy.indicators = extractBulletPoints(text, "bell", "indicator");
-    result.bellsPalsy.recommendations = extractBulletPoints(text, "bell", "recommend");
-    result.als.indicators = extractBulletPoints(text, "als", "indicator");
-    result.als.recommendations = extractBulletPoints(text, "als", "recommend");
+    result.alzheimersDisease.indicators = extractBulletPoints(text, "alzheimer", "indicator");
+    result.alzheimersDisease.recommendations = extractBulletPoints(text, "alzheimer", "recommend");
+    result.epilepsy.indicators = extractBulletPoints(text, "epilepsy", "indicator");
+    result.epilepsy.recommendations = extractBulletPoints(text, "epilepsy", "recommend");
     
     return result;
   } catch (error) {
@@ -593,7 +681,7 @@ function reconstructJsonFromText(text) {
 // Helper function to extract bullet points
 function extractBulletPoints(text, disorderKeyword, type) {
   try {
-    const sectionRegex = new RegExp(`${disorderKeyword}[^]*?${type}[^]*?([^]*)(?:recommend|risk|confidence|${disorderKeyword === 'als' ? 'overall' : 'als'}|${disorderKeyword === 'bell' ? 'overall' : 'bell'}|${disorderKeyword === 'parkinson' ? 'overall' : 'parkinson'}|$)`, 'i');
+    const sectionRegex = new RegExp(`${disorderKeyword}[^]*?${type}[^]*?([^]*)(?:recommend|risk|confidence|${disorderKeyword === 'epilepsy' ? 'overall' : 'epilepsy'}|${disorderKeyword === 'alzheimer' ? 'overall' : 'alzheimer'}|${disorderKeyword === 'parkinson' ? 'overall' : 'parkinson'}|$)`, 'i');
     const section = text.match(sectionRegex);
     
     if (section && section[1]) {

@@ -209,10 +209,10 @@ const AiAnalysisPanel = ({ userId, patientName = 'Patient' }) => {
               {renderDisorderSection("Parkinson's Disease", aiResults.parkinsonsDisease)}
             </Grid>
             <Grid item xs={12} md={4}>
-              {renderDisorderSection("Bell's Palsy", aiResults.bellsPalsy)}
+              {renderDisorderSection("Alzheimer's Disease", aiResults.alzheimersDisease)}
             </Grid>
             <Grid item xs={12} md={4}>
-              {renderDisorderSection("ALS", aiResults.als)}
+              {renderDisorderSection("Epilepsy", aiResults.epilepsy)}
             </Grid>
           </Grid>
           

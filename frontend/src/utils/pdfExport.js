@@ -40,13 +40,13 @@ export const exportAiAnalysisToPdf = async (analysisData, patientName = 'Patient
     let yPos = doc.previousAutoTable ? doc.previousAutoTable.finalY + 15 : 80;
     addDisorderSection(doc, 'Parkinson\'s Disease Assessment', analysisData.parkinsonsDisease, yPos);
     
-    // Conditions section - Bell's Palsy
+    // Conditions section - Alzheimer's
     yPos = doc.previousAutoTable ? doc.previousAutoTable.finalY + 15 : doc.previousAutoTable.finalY + 10;
-    addDisorderSection(doc, 'Bell\'s Palsy Assessment', analysisData.bellsPalsy, yPos);
+    addDisorderSection(doc, 'Alzheimer\'s Disease Assessment', analysisData.alzheimersDisease, yPos);
     
-    // Conditions section - ALS
+    // Conditions section - Epilepsy
     yPos = doc.previousAutoTable ? doc.previousAutoTable.finalY + 15 : doc.previousAutoTable.finalY + 10;
-    addDisorderSection(doc, 'ALS Assessment', analysisData.als, yPos);
+    addDisorderSection(doc, 'Epilepsy Assessment', analysisData.epilepsy, yPos);
     
     // Disclaimer
     yPos = doc.previousAutoTable ? doc.previousAutoTable.finalY + 15 : doc.previousAutoTable.finalY + 10;

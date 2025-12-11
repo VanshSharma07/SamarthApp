@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 import Lottie from "lottie-react";
-import micAnim from "../animations/mic.json";
+import micAnim from "../animations/Mic Animation.json";
 
 export default function MicLottie({ listening, onClick }) {
   const lottieRef = useRef(null);
