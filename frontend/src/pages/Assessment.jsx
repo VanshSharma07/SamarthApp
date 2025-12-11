@@ -26,8 +26,20 @@ import {
   TouchApp as TapIcon,
   ArrowBack as BackIcon,
   Mic as MicIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  InfoOutlined as InfoIcon,
+  FiberManualRecord as BulletIcon
 } from '@mui/icons-material';
+import { 
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText
+} from '@mui/material';
 import { Psychology as PsychologyIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -59,6 +71,8 @@ const Assessment = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedDisorder, setSelectedDisorder] = useState(null);
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [selectedInfoAssessment, setSelectedInfoAssessment] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -118,7 +132,21 @@ const Assessment = () => {
       icon: EyeIcon,
       component: EyeMovement,
       route: '/assessment/eye-movement',
-      color: '#3f51b5' // Indigo
+      color: '#3f51b5', // Indigo
+      instructions: [
+        "Sit comfortably in a well-lit room.",
+        "Ensure your face is clearly visible to the camera.",
+        "Follow the moving dot on the screen with your eyes without moving your head.",
+        "Keep your head steady throughout the assessment."
+      ],
+      hardwareRequirements: [
+        "Webcam / Front-facing camera"
+      ],
+      expectedResults: [
+        "The system tracks your pupil movement.",
+        "Smooth pursuit and saccadic movements are analyzed for irregularities.",
+        "A heatmap of your gaze will be generated."
+      ]
     },
     // {
     //   id: 'neckMobility',
@@ -137,7 +165,20 @@ const Assessment = () => {
       icon: TremorIcon,
       component: Tremor,
       route: '/assessment/tremor',
-      color: '#673ab7' // Deep Purple
+      color: '#673ab7', // Deep Purple
+      instructions: [
+        "Wear the Smart Glove on your dominant hand.",
+        "Ensure the glove is connected and calibrated.",
+        "Extend your arm forward and hold as instructed.",
+        "Relax and breathe normally."
+      ],
+      hardwareRequirements: [
+        "Smart Glove"
+      ],
+      expectedResults: [
+        "Tremor frequency and amplitude will be measured.",
+        "Resting and postural tremors will be differentiated."
+      ]
     },
     {
       id: 'responseTime',
@@ -146,7 +187,20 @@ const Assessment = () => {
       icon: TimerIcon,
       component: ResponseTime,
       route: '/assessment/response-time',
-      color: '#2196f3' // Blue
+      color: '#2196f3', // Blue
+      instructions: [
+        "Watch the screen closely.",
+        "Tap the screen or press the key as soon as the signal appears.",
+        "React as quickly as possible.",
+        "There will be multiple trials."
+      ],
+      hardwareRequirements: [
+        "Touchscreen or Mouse/Keyboard"
+      ],
+      expectedResults: [
+        "Reaction time in milliseconds will be recorded.",
+        "Average response time and variability will be calculated."
+      ]
     },
     {
       id: 'gaitAnalysis',
@@ -155,7 +209,21 @@ const Assessment = () => {
       icon: WalkIcon,
       component: GaitAnalysis,
       route: '/assessment/gait-analysis',
-      color: '#4caf50' // Green
+      color: '#4caf50', // Green
+      instructions: [
+        "Wear the Smart Insoles in your shoes.",
+        "Ensure the insoles are connected.",
+        "Walk back and forth in the designated area.",
+        "Walk naturally at your normal pace."
+      ],
+      hardwareRequirements: [
+        "Smart Insoles",
+        "Clear space for walking"
+      ],
+      expectedResults: [
+        "Stride length, step width, and walking speed will be analyzed.",
+        "Postural stability and arm swing symmetry will be evaluated."
+      ]
     },
     {
       id: 'fingerTapping',
@@ -164,7 +232,20 @@ const Assessment = () => {
       icon: TapIcon,
       component: FingerTapping,
       route: '/assessment/finger-tapping',
-      color: '#e91e63' // Pink
+      color: '#e91e63', // Pink
+      instructions: [
+        "Position your hand clearly in front of the webcam.",
+        "Ensure your fingers are visible to the camera.",
+        "Tap your index finger against your thumb as fast as possible.",
+        "Maintain the rhythm until valid data is captured."
+      ],
+      hardwareRequirements: [
+        "Webcam / Computer Vision"
+      ],
+      expectedResults: [
+        "Tapping frequency and rhythm consistency will be measured.",
+        "Fatigue rate over time will be analyzed."
+      ]
     },
     {
       id: 'speechPattern',
@@ -173,7 +254,20 @@ const Assessment = () => {
       icon: MicIcon,
       component: SpeechPatternAssessment,
       route: '/assessment/speech-pattern',
-      color: '#ff9800' // Orange
+      color: '#ff9800', // Orange
+      instructions: [
+        "Find a quiet environment.",
+        "Read the displayed text aloud clearly.",
+        "Sustain the vowel 'Ahhh' for as long as you comfortably can.",
+        "Speak naturally into the microphone."
+      ],
+      hardwareRequirements: [
+        "Microphone"
+      ],
+      expectedResults: [
+        "Voice pitch, volume (loudness), and jitter/shimmer will be analyzed.",
+        "Speech rate and pauses will be detected."
+      ]
     }
     ,
     {
@@ -183,7 +277,20 @@ const Assessment = () => {
       icon: MicIcon,
       component: WordListAssessment,
       route: '/assessment/word-list',
-      color: '#8e24aa'
+      color: '#8e24aa',
+      instructions: [
+        "Listen to or read the list of words presented.",
+        "Recall as many words as you can immediately after.",
+        "You may be asked to recall them again after a delay."
+      ],
+      hardwareRequirements: [
+        "Microphone",
+        "Speakers/Headphones"
+      ],
+      expectedResults: [
+        "Immediate and delayed recall scores.",
+        "Analysis of semantic clustering or serial position effects."
+      ]
     }
     ,
     {
@@ -193,7 +300,19 @@ const Assessment = () => {
       icon: MicIcon,
       component: NeuroAssessment,
       route: '/assessment/neuro',
-      color: '#F57C00'
+      color: '#F57C00',
+      instructions: [
+        "Ensure the text EEG/ECG device is properly connected and electrode contacts are good.",
+        "Sit quietly and relax.",
+        "Avoid excessive movement or talking during the recording."
+      ],
+      hardwareRequirements: [
+        "Compatible EEG/ECG Headset/Device"
+      ],
+      expectedResults: [
+        "Real-time EEG and ECG waveforms.",
+        "Detection of abnormal spikes or rhythms."
+      ]
     }
   ,
     {
@@ -203,7 +322,20 @@ const Assessment = () => {
       icon: MicIcon,
       component: HyperventilationResponseTest,
       route: '/assessment/hyperventilation',
-      color: '#d32f2f'
+      color: '#d32f2f',
+      instructions: [
+        "Wear the EEG Band correctly on your head.",
+        "Follow the breathing pacing guide: breathe in and out deeply.",
+        "Continue for 3 minutes or as instructed.",
+        "Relax immediately if you feel dizzy or unwell."
+      ],
+      hardwareRequirements: [
+        "EEG Band"
+      ],
+      expectedResults: [
+        "Physiological response to hyperventilation stress.",
+        "Recovery time to baseline metrics."
+      ]
     }
   ,
     {
@@ -213,7 +345,20 @@ const Assessment = () => {
       icon: PsychologyIcon,
       component: StroopTest,
       route: '/assessment/stroop',
-      color: '#1976d2'
+      color: '#1976d2',
+      instructions: [
+        "You will see color words (e.g., 'RED', 'BLUE') displayed in different ink colors.",
+        "Select the color of the **INK**, not the word itself.",
+        "Respond as quickly and accurately as possible."
+      ],
+      hardwareRequirements: [
+        "Screen (Color display)",
+        "Input device (Touch/Mouse)"
+      ],
+      expectedResults: [
+        "Reaction time difference between congruent and incongruent stimuli.",
+        "Processing speed and inhibition control score."
+      ]
     },
     {
       id: 'conversationalBot',
@@ -222,7 +367,20 @@ const Assessment = () => {
       icon: MicIcon,
       component: BotScreen,
       route: '/assessment/bot',
-      color: '#009688' // Teal
+      color: '#009688', // Teal
+      instructions: [
+        "Engage in a conversation with the AI assistant.",
+        "Answer questions naturally and honestly.",
+        "Ask for clarification if you don't understand a question."
+      ],
+      hardwareRequirements: [
+        "Microphone",
+        "Speakers"
+      ],
+      expectedResults: [
+        "Cognitive screening score based on verbal responses.",
+        "Analysis of language complexity and coherence."
+      ]
     }
   ];
   // Map disorders to relevant assessment IDs (based on your table)
@@ -296,6 +454,16 @@ const Assessment = () => {
   // Function to check if assessment is completed
   const isAssessmentCompleted = (id) => {
     return completedAssessments.includes(id);
+  };
+  
+  const handleOpenInfo = (assessment) => {
+    setSelectedInfoAssessment(assessment);
+    setInfoDialogOpen(true);
+  };
+
+  const handleCloseInfo = () => {
+    setInfoDialogOpen(false);
+    setSelectedInfoAssessment(null);
   };
 
   const startAssessment = (assessmentType, index) => {
@@ -437,6 +605,22 @@ const Assessment = () => {
               <Typography variant="h5" component="h1" fontWeight="500">
                 {assessment.title}
               </Typography>
+            </Box>
+            
+            <Box sx={{ ml: 'auto' }}>
+              <Tooltip title="Assessment Instructions & Info">
+                <IconButton 
+                  onClick={() => handleOpenInfo(assessment)}
+                  color="primary"
+                  sx={{ 
+                    bgcolor: 'primary.light', 
+                    color: 'white',
+                    '&:hover': { bgcolor: 'primary.main' }
+                  }}
+                >
+                  <InfoIcon />
+                </IconButton>
+              </Tooltip>
             </Box>
           </Box>
           
@@ -715,6 +899,86 @@ const Assessment = () => {
   return (
     <Layout>
       {currentAssessment ? renderAssessment() : renderAssessmentList()}
+      
+      {/* Information Dialog */}
+      <Dialog 
+        open={infoDialogOpen} 
+        onClose={handleCloseInfo}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3, p: 1 }
+        }}
+      >
+        {selectedInfoAssessment && (
+          <>
+            <DialogTitle sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider', 
+              pb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2
+            }}>
+              <selectedInfoAssessment.icon color="primary" fontSize="large" />
+              <Box>
+                <Typography variant="h6">{selectedInfoAssessment.title}</Typography>
+                <Typography variant="caption" color="text.secondary">Assessment Guide</Typography>
+              </Box>
+            </DialogTitle>
+            <DialogContent sx={{ pt: 3 }}>
+              {/* Instructions */}
+              <Typography variant="subtitle1" fontWeight="600" color="primary" gutterBottom>
+                Instructions
+              </Typography>
+              <List dense>
+                {selectedInfoAssessment.instructions?.map((instruction, idx) => (
+                  <ListItem key={idx} alignItems="flex-start" sx={{ pl: 0 }}>
+                    <ListItemIcon sx={{ minWidth: 30, mt: 0.5 }}>
+                      <BulletIcon fontSize="small" color="primary" sx={{ fontSize: 10 }} />
+                    </ListItemIcon>
+                    <ListItemText primary={instruction} />
+                  </ListItem>
+                ))}
+              </List>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Hardware Requirements */}
+              <Typography variant="subtitle1" fontWeight="600" color="primary" gutterBottom>
+                Hardware Requirements
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                {selectedInfoAssessment.hardwareRequirements?.map((req, idx) => (
+                  <Chip key={idx} label={req} size="small" variant="outlined" />
+                ))}
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Expected Results */}
+              <Typography variant="subtitle1" fontWeight="600" color="primary" gutterBottom>
+                Expected Results & Validation
+              </Typography>
+              <List dense>
+                {selectedInfoAssessment.expectedResults?.map((result, idx) => (
+                  <ListItem key={idx} alignItems="flex-start" sx={{ pl: 0 }}>
+                     <ListItemIcon sx={{ minWidth: 30, mt: 0.5 }}>
+                      <CheckCircleIcon fontSize="small" color="success" sx={{ fontSize: 16 }} />
+                    </ListItemIcon>
+                    <ListItemText primary={result} />
+                  </ListItem>
+                ))}
+              </List>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 3 }}>
+              <Button onClick={handleCloseInfo} variant="contained" fullWidth>
+                Got it
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Layout>
   );
 };
