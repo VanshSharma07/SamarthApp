@@ -9,9 +9,9 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Lege
 import { useAuth } from '../../contexts/AuthContext';
 
 const DEFAULT_PHASES = [
-  { name: 'baseline', min: 60, max: 120, default: 60 },
-  { name: 'hyperventilation', min: 60, max: 120, default: 60 },
-  { name: 'recovery', min: 60, max: 120, default: 60 }
+  { name: 'baseline', min: 10, max: 30, default: 10 },
+  { name: 'hyperventilation', min: 15, max: 30, default: 15 },
+  { name: 'recovery', min: 10, max: 30, default: 10 }
 ];
 
 const HyperventilationResponseTest = ({ userId: propUserId } = {}) => {

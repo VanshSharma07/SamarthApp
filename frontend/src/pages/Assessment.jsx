@@ -184,8 +184,7 @@ const Assessment = () => {
       component: WordListAssessment,
       route: '/assessment/word-list',
       color: '#8e24aa'
-    }
-    ,
+    },
     /*
     {
       id: 'neuro',
@@ -195,9 +194,8 @@ const Assessment = () => {
       component: NeuroAssessment,
       route: '/assessment/neuro',
       color: '#F57C00'
-    }
+    },
     */
-  ,
     {
       id: 'hyperventilation',
       title: 'Hyperventilation Response Test',

@@ -1,5 +1,6 @@
 import EpilepsyTest from '../models/EpilepsyTest.js';
 import SignalFrame from '../models/SignalFrame.js';
+import HyperventilationAssessment from '../models/HyperventilationAssessment.js';
 import mongoose from 'mongoose';
 
 // Function to calculate EEG band powers from raw data
@@ -330,6 +331,95 @@ export async function completeTest(req, res) {
     t.status = 'completed';
     t.summaryMetrics = summary;
     await t.save();
+
+    // Save HyperventilationAssessment result (following assessment model pattern)
+    try {
+      const baselineData = allPhaseData.baseline || { eegData: [] };
+      const hvData = allPhaseData.hyperventilation || { eegData: [] };
+      const recoveryData = allPhaseData.recovery || { eegData: [] };
+
+      // Calculate metrics for each phase
+      const extractPhaseMetrics = (phaseData, phaseName) => {
+        if (!phaseData || !phaseData.eegData || phaseData.eegData.length === 0) {
+          return {
+            duration: 60,
+            heartRate: 0,
+            bandPowers: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
+            spikes: 0
+          };
+        }
+
+        const phaseInfo = t.phases.find(p => p.name === phaseName) || {};
+        return {
+          duration: phaseInfo.duration || 60,
+          heartRate: phaseData.hr || 0,
+          bandPowers: phaseData.bandPowers || { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
+          spikes: phaseData.spikes || 0
+        };
+      };
+
+      const baselineMetrics = extractPhaseMetrics(baselineData, 'baseline');
+      const hvMetrics = extractPhaseMetrics(hvData, 'hyperventilation');
+      const recoveryMetrics = extractPhaseMetrics(recoveryData, 'recovery');
+
+      // Calculate clinical metrics
+      const alphaSuppression = baselineMetrics.bandPowers.alpha > 0 
+        ? ((baselineMetrics.bandPowers.alpha - hvMetrics.bandPowers.alpha) / baselineMetrics.bandPowers.alpha) * 100 
+        : 0;
+
+      const deltaIncrease = baselineMetrics.bandPowers.delta > 0 
+        ? ((hvMetrics.bandPowers.delta - baselineMetrics.bandPowers.delta) / baselineMetrics.bandPowers.delta) * 100 
+        : 0;
+
+      const alphaRecovery = hvMetrics.bandPowers.alpha > 0 
+        ? ((recoveryMetrics.bandPowers.alpha - hvMetrics.bandPowers.alpha) / hvMetrics.bandPowers.alpha) * 100 
+        : 0;
+
+      const totalSpikes = baselineMetrics.spikes + hvMetrics.spikes + recoveryMetrics.spikes;
+      const riskLevel = totalSpikes > 10 ? 'high' : totalSpikes > 5 ? 'moderate' : 'low';
+
+      const assessment = new HyperventilationAssessment({
+        userId: t.userId,
+        testId: t._id,
+        timestamp: new Date(),
+        type: 'hyperventilation',
+        status: 'COMPLETED',
+        metrics: {
+          riskLevel,
+          screeningFlag: clinicalIndicators.screening_flag || summary.epilepsyScreening.screeningFlag,
+          recommendedAction: clinicalIndicators.recommended_action || summary.epilepsyScreening.recommendedAction,
+          baseline: baselineMetrics,
+          hyperventilation: { ...hvMetrics, alphaSuppression: Math.round(alphaSuppression) },
+          recovery: recoveryMetrics,
+          clinicalIndicators: {
+            findings: clinicalIndicators.findings || [],
+            clinicalNotes: clinicalIndicators.clinical_notes || '',
+            comparison: {
+              baselineVsHv: {
+                alphaSuppression: Math.round(alphaSuppression),
+                deltaIncrease: Math.round(deltaIncrease)
+              },
+              hvVsRecovery: {
+                alphaRecovery: Math.round(alphaRecovery),
+                deltaDecrease: totalSpikes > 0 ? -Math.round(deltaIncrease) : 0
+              },
+              overallResponse: clinicalIndicators.comparison?.overall_response || summary.epilepsyScreening.screeningFlag
+            }
+          },
+          summaryMetrics: {
+            totalDuration: baselineMetrics.duration + hvMetrics.duration + recoveryMetrics.duration,
+            overallRiskScore: riskLevel === 'high' ? 75 : riskLevel === 'moderate' ? 50 : 25,
+            abnormalityDetected: riskLevel !== 'low'
+          }
+        }
+      });
+
+      await assessment.save();
+      console.log('[completeTest] HyperventilationAssessment saved:', assessment._id);
+    } catch (assessmentErr) {
+      console.error('[completeTest] Error saving HyperventilationAssessment:', assessmentErr.message);
+      // Don't fail the test completion if assessment save fails
+    }
 
     return res.json({ success: true, summary });
   } catch (err) {

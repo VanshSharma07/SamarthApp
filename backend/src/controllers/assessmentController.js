@@ -8,6 +8,7 @@ import FingerTappingAssessment from '../models/FingerTappingAssessment.js';
 import FacialSymmetryAssessment from '../models/FacialSymmetryAssessment.js';
 import EyeMovementAssessment from '../models/EyeMovementAssessment.js';
 import StroopAssessment from '../models/StroopAssessment.js';
+import HyperventilationAssessment from '../models/HyperventilationAssessment.js';
 import Test from '../models/Test.js';
 import Score from '../models/Score.js';
 import EpilepsyTest from '../models/EpilepsyTest.js';
@@ -419,33 +420,37 @@ export const getAssessmentHistory = async (req, res) => {
             })
         );
         
-        // Add neuro/hyperventilation (EpilepsyTest model)
+        // Add hyperventilation assessments (HyperventilationAssessment model)
         promises.push(
-          EpilepsyTest.find({ 
-            $or: [
-              { userId },
-              { userId: new mongoose.Types.ObjectId(userId).toString ? new mongoose.Types.ObjectId(userId) : userId }
-            ]
+          HyperventilationAssessment.find({ 
+            userId: userId.toString ? userId.toString() : userId
           })
-            .sort({ startedAt: -1 })
+            .sort({ timestamp: -1 })
             .limit(parseInt(limit))
             .lean()
             .then(results => {
               console.log(`Found ${results.length} hyperventilation assessments`);
               return results.map(r => {
                 const metrics = {
-                  baseline_hr: r.summaryMetrics?.baselineHR || 0,
-                  hv_hr: r.summaryMetrics?.hvHR || 0,
-                  recovery_hr: r.summaryMetrics?.recoveryHR || 0,
-                  hv_response: 'Normal'
+                  riskLevel: r.metrics?.riskLevel || 'low',
+                  screeningFlag: r.metrics?.screeningFlag || 'No significant abnormality detected',
+                  recommendedAction: r.metrics?.recommendedAction || 'Routine follow-up',
+                  baselineSpikes: r.metrics?.baseline?.spikes || 0,
+                  hyperventilationSpikes: r.metrics?.hyperventilation?.spikes || 0,
+                  recoverySpikes: r.metrics?.recovery?.spikes || 0,
+                  alphaSuppression: r.metrics?.hyperventilation?.alphaSuppression || 0,
+                  baselineHR: r.metrics?.baseline?.heartRate || 0,
+                  hvHR: r.metrics?.hyperventilation?.heartRate || 0,
+                  recoveryHR: r.metrics?.recovery?.heartRate || 0
                 };
                 console.log(`[Hyperventilation] Metrics:`, JSON.stringify(metrics));
                 return {
-                  ...r,
+                  _id: r._id,
                   type: 'hyperventilation',
-                  timestamp: r.endedAt || r.startedAt,
-                  status: r.status || 'completed',
-                  metrics: metrics
+                  timestamp: r.timestamp,
+                  status: r.status || 'COMPLETED',
+                  metrics: metrics,
+                  testId: r.testId
                 };
               });
             })

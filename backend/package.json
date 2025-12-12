@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "vitest run",
-    "seed:hyperventilation": "node scripts/seedHyperventilationTest.js"
+    "seed:hyperventilation": "node scripts/seedHyperventilationTest.js",
+    "migrate:hyperventilation": "node scripts/migrateEpilepsyTestToHyperventilationAssessment.js"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.27.0",
