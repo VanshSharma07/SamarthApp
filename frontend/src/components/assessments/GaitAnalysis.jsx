@@ -21,13 +21,14 @@ import {
 import { Line } from 'react-chartjs-2';
 import AssessmentLayout from './AssessmentLayout';
 import { startGaitAnalysis, stopGaitAnalysis } from '../../services/assessments/gaitService';
-import assessmentService from '../../services/assessmentService';
+import assessmentService, { ASSESSMENT_TYPES } from '../../services/assessmentService';
 import {
   GaitPhaseChart,
   StabilityHeatmap,
   SymmetryRadar,
   JointAnglesTimeline
 } from '../visualizations/GaitVisualizations';
+import HybridGaitInsights from '../gait/HybridGaitInsights';
 import { GaitMetricsAnalyzer } from '../../services/metrics/gaitMetrics';
 import { useAuth } from '../../contexts/AuthContext';
 import { assessment, specializedAssessments } from '../../services/api';
@@ -86,6 +87,9 @@ const GaitAnalysis = ({ userId, onComplete }) => {
   const { currentUser } = useAuth();
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [ws, setWs] = useState(null);
+  const sensorBufferRef = useRef([]); // Store raw sensor packets during assessment
+  const isRecordingRef = useRef(false); // Ref for WebSocket handler to access current recording state
+  const [hybridMetrics, setHybridMetrics] = useState(null);
   const [sensorData, setSensorData] = useState({
     deviceId: null,
     connected: false,
@@ -205,10 +209,14 @@ const GaitAnalysis = ({ userId, onComplete }) => {
       cleanup();
       setLoading(true);
       setIsRecording(true);
+      isRecordingRef.current = true; // Set ref for WebSocket handler
       setError(null);
       setMetrics(null);
       setAnalysisComplete(false);
+      setHybridMetrics(null);
       setSaveStatus({ saving: false, error: null, success: false });
+      sensorBufferRef.current = []; // Clear sensor buffer at start of assessment
+      console.log('🧹 Sensor buffer cleared, starting recording...');
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
@@ -256,6 +264,15 @@ const GaitAnalysis = ({ userId, onComplete }) => {
   const finishRecording = async () => {
     try {
       setIsRecording(false);
+      isRecordingRef.current = false; // Update ref
+      console.log('⏹️ Recording stopped. Sensor buffer contains:', sensorBufferRef.current.length, 'packets');
+      if (sensorBufferRef.current.length > 0) {
+        console.log('📦 First packet sample:', sensorBufferRef.current[0]);
+        console.log('📦 Last packet sample:', sensorBufferRef.current[sensorBufferRef.current.length - 1]);
+      } else {
+        console.warn('⚠️ Sensor buffer is EMPTY! No data will be sent to backend.');
+      }
+      
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -437,8 +454,12 @@ const GaitAnalysis = ({ userId, onComplete }) => {
             jointData: realtimeData.jointData,
             symmetryData: realtimeData.symmetryData
           }
-        }
+        },
+        // Include sensor buffer for backend processing
+        sensorBuffer: sensorBufferRef.current.length > 0 ? sensorBufferRef.current : undefined
       };
+
+      console.log('💾 Saving assessment with', sensorBufferRef.current.length, 'sensor samples');
 
       // Use specialized assessment API instead
       const response = await specializedAssessments.gaitAnalysis.save(assessmentData);
@@ -449,12 +470,25 @@ const GaitAnalysis = ({ userId, onComplete }) => {
       
       console.log('Gait analysis assessment saved successfully:', response.data);
       
+        const savedMetrics = response.data.data?.metrics;
+        if (savedMetrics) {
+          // Log available metric keys to help verify abnormalities/recommendations presence
+          try {
+            // Avoid noisy logs in production; safe in dev
+            // eslint-disable-next-line no-console
+            console.debug('[GaitAnalysis] Saved metrics keys:', Object.keys(savedMetrics));
+          } catch {}
+          setHybridMetrics(savedMetrics);
+          console.log('✅ Hybrid metrics retrieved from backend');
+      }
+      
       setSaveStatus({ saving: false, error: null, success: true });
       
       if (onComplete) {
         onComplete({
           ...assessmentData,
-          id: response.data.data?.id || response.data.data?._id
+          id: response.data.data?.id || response.data.data?._id,
+          hybridMetrics: response.data.data?.metrics
         });
       }
     } catch (err) {
@@ -733,6 +767,23 @@ const GaitAnalysis = ({ userId, onComplete }) => {
     );
   };
 
+  const renderHybridInsights = () => {
+    if (!hybridMetrics) return null;
+
+    return (
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
+          Hybrid Analysis Results
+        </Typography>
+        <HybridGaitInsights
+          hybridMetrics={hybridMetrics}
+          cvMetrics={metrics}
+          sensorMetrics={hybridMetrics.sensorMetrics}
+        />
+      </Box>
+    );
+  };
+
   // Handle incoming sensor data from WebSocket
   const handleSensorData = (data) => {
     // Update sensor data state for display
@@ -744,6 +795,21 @@ const GaitAnalysis = ({ userId, onComplete }) => {
       imu: data.imu || prevData.imu,
       timestamp: data.timestamp || Date.now()
     }));
+
+    // Buffer sensor data if recording (use ref to avoid closure issue)
+    if (isRecordingRef.current) {
+      sensorBufferRef.current.push({
+        timestamp: data.timestamp || Date.now(),
+        deviceId: data.deviceId,
+        leftFoot: data.leftFoot,
+        rightFoot: data.rightFoot,
+        imu: data.imu
+      });
+      // Log every 50 packets to reduce console noise
+      if (sensorBufferRef.current.length % 50 === 0) {
+        console.log('📝 Buffering sensor data:', sensorBufferRef.current.length, 'packets collected');
+      }
+    }
   };
 
   return (
@@ -816,6 +882,25 @@ const GaitAnalysis = ({ userId, onComplete }) => {
                 {isRecording ? 'Stop Recording' : 'Start Recording'}
               </Button>
               
+              {/* Show buffer status during recording */}
+              {isRecording && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  Recording... {sensorBufferRef.current.length} sensor packets buffered
+                </Alert>
+              )}
+              
+              {/* Show buffer summary after recording stops */}
+              {analysisComplete && !saveStatus.success && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  ✅ Recording complete! {sensorBufferRef.current.length} sensor packets captured.
+                  {sensorBufferRef.current.length === 0 && (
+                    <Box component="span" sx={{ display: 'block', mt: 1, color: 'warning.main' }}>
+                      ⚠️ No sensor data collected. Ensure test-sensor-client is running.
+                    </Box>
+                  )}
+                </Alert>
+              )}
+              
               {renderSaveStatus()}
               
               {/* Add Complete Assessment button */}
@@ -846,6 +931,10 @@ const GaitAnalysis = ({ userId, onComplete }) => {
         {renderSensorDashboard()}
 
         {renderEnhancedVisualizations()}
+        
+        {/* Hybrid Metrics Insights */}
+        {renderHybridInsights()}
+        
         {renderMetrics()}
       </Box>
     </AssessmentLayout>

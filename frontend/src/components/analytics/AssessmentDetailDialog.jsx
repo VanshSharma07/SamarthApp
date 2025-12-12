@@ -14,13 +14,15 @@ import {
   Tab,
   Tabs,
   Paper,
-  Chip
+  Chip,
+  Alert
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useState, useEffect } from 'react';
 import LineChart from '../charts/LineChart';
 import RadarChart from '../charts/RadarChart';
 import BarChart from '../charts/BarChart';
+import HybridGaitInsights from '../gait/HybridGaitInsights';
 
 const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
   const theme = useTheme();
@@ -332,53 +334,72 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
     </Grid>
   );
 
-  const renderGaitAnalysisMetrics = () => (
-    <Grid container spacing={2}>
-      <Grid item xs={6} md={4}>
-        <Typography variant="subtitle2">Stability Score</Typography>
-        <Typography variant="h6">{validatedAssessment.metrics.stability?.score}/1000</Typography>
+  const renderGaitAnalysisMetrics = () => {
+    // If hybrid metrics are available, show the full insights UI instead of basic metrics
+    if (validatedAssessment.metrics?.hybrid || validatedAssessment.metrics?.abnormalities) {
+      return (
+        <Box sx={{ width: '100%' }}>
+          {/* Show HybridGaitInsights if available */}
+          {validatedAssessment.metrics && (
+            <HybridGaitInsights 
+              hybridMetrics={validatedAssessment.metrics}
+              cvMetrics={validatedAssessment.metrics}
+              sensorMetrics={validatedAssessment.metrics?.sensorMetrics}
+            />
+          )}
+        </Box>
+      );
+    }
+    
+    // Default: Show basic CV metrics
+    return (
+      <Grid container spacing={2}>
+        <Grid item xs={6} md={4}>
+          <Typography variant="subtitle2">Stability Score</Typography>
+          <Typography variant="h6">{validatedAssessment.metrics.stability?.score}/1000</Typography>
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <Typography variant="subtitle2">Balance Score</Typography>
+          <Typography variant="h6">{validatedAssessment.metrics.balance?.score}/1000</Typography>
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <Typography variant="subtitle2">Overall Symmetry</Typography>
+          <Typography variant="h6">{validatedAssessment.metrics.symmetry?.overall}/1000</Typography>
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <Typography variant="subtitle2">Walking Speed</Typography>
+          <Typography variant="h6">{validatedAssessment.metrics.gait?.speed} m/s</Typography>
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <Typography variant="subtitle2">Stride Length</Typography>
+          <Typography variant="h6">{validatedAssessment.metrics.gait?.strideLength} m</Typography>
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <Typography variant="subtitle2">Cadence</Typography>
+          <Typography variant="h6">{validatedAssessment.metrics.gait?.cadence} steps/min</Typography>
+        </Grid>
+        {validatedAssessment.metrics.overall && (
+          <>
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Overall Scores</Typography>
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <Typography variant="subtitle2">Mobility Score</Typography>
+              <Typography variant="h6">{validatedAssessment.metrics.overall.mobilityScore}/100</Typography>
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <Typography variant="subtitle2">Stability Score</Typography>
+              <Typography variant="h6">{validatedAssessment.metrics.overall.stabilityScore}/1000</Typography>
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <Typography variant="subtitle2">Symmetry Score</Typography>
+              <Typography variant="h6">{validatedAssessment.metrics.overall.symmetryScore}/1000</Typography>
+            </Grid>
+          </>
+        )}
       </Grid>
-      <Grid item xs={6} md={4}>
-        <Typography variant="subtitle2">Balance Score</Typography>
-        <Typography variant="h6">{validatedAssessment.metrics.balance?.score}/1000</Typography>
-      </Grid>
-      <Grid item xs={6} md={4}>
-        <Typography variant="subtitle2">Overall Symmetry</Typography>
-        <Typography variant="h6">{validatedAssessment.metrics.symmetry?.overall}/1000</Typography>
-      </Grid>
-      <Grid item xs={6} md={4}>
-        <Typography variant="subtitle2">Walking Speed</Typography>
-        <Typography variant="h6">{validatedAssessment.metrics.gait?.speed} m/s</Typography>
-      </Grid>
-      <Grid item xs={6} md={4}>
-        <Typography variant="subtitle2">Stride Length</Typography>
-        <Typography variant="h6">{validatedAssessment.metrics.gait?.strideLength} m</Typography>
-      </Grid>
-      <Grid item xs={6} md={4}>
-        <Typography variant="subtitle2">Cadence</Typography>
-        <Typography variant="h6">{validatedAssessment.metrics.gait?.cadence} steps/min</Typography>
-      </Grid>
-      {validatedAssessment.metrics.overall && (
-        <>
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Overall Scores</Typography>
-          </Grid>
-          <Grid item xs={6} md={4}>
-            <Typography variant="subtitle2">Mobility Score</Typography>
-            <Typography variant="h6">{validatedAssessment.metrics.overall.mobilityScore}/100</Typography>
-          </Grid>
-          <Grid item xs={6} md={4}>
-            <Typography variant="subtitle2">Stability Score</Typography>
-            <Typography variant="h6">{validatedAssessment.metrics.overall.stabilityScore}/1000</Typography>
-          </Grid>
-          <Grid item xs={6} md={4}>
-            <Typography variant="subtitle2">Symmetry Score</Typography>
-            <Typography variant="h6">{validatedAssessment.metrics.overall.symmetryScore}/1000</Typography>
-          </Grid>
-        </>
-      )}
-    </Grid>
-  );
+    );
+  };
 
   const renderFingerTappingMetrics = () => (
     <Grid container spacing={2}>
@@ -998,9 +1019,14 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
     >
       <DialogTitle id="assessment-detail-dialog">
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" component="div">
-            {getAssessmentName()}
-          </Typography>
+          <Box>
+            <Typography variant="h6" component="div">
+              {getAssessmentName()}
+            </Typography>
+            <Typography variant="subtitle2" component="div" color="text.secondary">
+              {formattedDate}
+            </Typography>
+          </Box>
           <IconButton
             aria-label="close"
             onClick={onClose}
@@ -1011,9 +1037,6 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
             <CloseIcon />
           </IconButton>
         </Box>
-        <Typography variant="subtitle2" color="text.secondary">
-          {formattedDate}
-        </Typography>
       </DialogTitle>
       <DialogContent dividers>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>

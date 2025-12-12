@@ -541,9 +541,11 @@ DO NOT include any explanatory text outside the JSON. The entire response should
 // Helper function to parse the AI response
 function parseAiResponse(text) {
   try {
-    // First attempt: Try to parse the entire response as JSON
+    const cleanedText = cleanAiResponseText(text);
+    console.log('Cleaned AI response preview:', cleanedText.substring(0, 300));
+    // First attempt: Try to parse the cleaned response as JSON
     try {
-      return JSON.parse(text);
+      return JSON.parse(cleanedText);
     } catch (e) {
       console.log('Could not parse entire response as JSON, trying extraction...');
     }
@@ -556,7 +558,7 @@ function parseAiResponse(text) {
     ];
     
     for (const pattern of patterns) {
-      const matches = text.match(pattern);
+      const matches = cleanedText.match(pattern);
       if (matches && matches.length > 0) {
         const jsonStr = matches[0];
         try {
@@ -570,13 +572,13 @@ function parseAiResponse(text) {
     
     // Third attempt: Try to reconstruct the JSON from the text
     console.log('Attempting to reconstruct JSON from text...');
-    const reconstructedJson = reconstructJsonFromText(text);
+    const reconstructedJson = reconstructJsonFromText(cleanedText);
     if (reconstructedJson) {
       return reconstructedJson;
     }
     
     console.warn('Could not extract JSON from AI response, using fallback format');
-    console.log('First 500 chars of response:', text.substring(0, 500));
+    console.log('First 500 chars of response:', cleanedText.substring(0, 500));
     
     // If all attempts fail, return a basic structure with new disorders
     return {
@@ -605,9 +607,45 @@ function parseAiResponse(text) {
     console.error('Error parsing AI response:', error);
     return {
       error: "Failed to parse AI response",
-      rawText: text
+      rawText: cleanedText
     };
   }
+}
+
+// Normalize AI response text before parsing
+function cleanAiResponseText(text) {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text.trim();
+
+  // Extract first fenced code block if present
+  const fenceMatch = cleaned.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+  if (fenceMatch && fenceMatch[1]) {
+    cleaned = fenceMatch[1];
+  }
+
+  // Strip leftover fences/backticks
+  cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+  cleaned = cleaned.replace(/```/g, '');
+
+  // Remove trailing commas before closing braces/brackets (global)
+  cleaned = cleaned.replace(/,\s*(\]|\})/g, '$1');
+
+  // Keep only content between the first '{' and the last '}' to drop stray text
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  }
+
+  // Normalize newlines and carriage returns
+  cleaned = cleaned.replace(/\r\n?/g, '\n');
+
+  // Remove stray leading/trailing quotes around entire payload
+  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+    cleaned = cleaned.slice(1, -1);
+  }
+
+  return cleaned.trim();
 }
 
 // Helper function to reconstruct JSON from text

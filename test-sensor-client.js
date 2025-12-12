@@ -1,7 +1,10 @@
 const WebSocket = require('ws');
 
 // Connect to the backend WebSocket server
-const ws = new WebSocket('ws://localhost:5000/ws/sensors');
+// For local testing: ws://localhost:5000/ws/sensors
+// For remote device: ws://YOUR_IP:5000/ws/sensors (e.g., ws://192.168.1.100:5000/ws/sensors)
+const SERVER_URL = process.env.WS_SERVER || 'ws://localhost:5000/ws/sensors';
+const ws = new WebSocket(SERVER_URL);
 
 ws.on('open', () => {
   console.log('✅ Connected to WebSocket server');
@@ -87,5 +90,5 @@ ws.on('error', (error) => {
   process.exit(1);
 });
 
-console.log('🔌 Connecting to ws://localhost:5000/ws/sensors...');
+console.log(`🔌 Connecting to ${SERVER_URL}...`);
 console.log('Press Ctrl+C to stop\n');

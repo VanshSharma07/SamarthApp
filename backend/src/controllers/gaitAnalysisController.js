@@ -1,4 +1,6 @@
 import { gaitAnalysisService } from '../services/gaitAnalysisService.js';
+import { sensorMetricsService } from '../services/sensorMetricsService.js';
+import { hybridMetricsMerger } from '../services/hybridMetricsMerger.js';
 import WebSocket from 'ws';
 
 export const gaitAnalysisController = {
@@ -7,7 +9,8 @@ export const gaitAnalysisController = {
       console.log('Received gait analysis assessment request:', {
         path: req.path,
         method: req.method,
-        userId: req.body.userId
+        userId: req.body.userId,
+        hasSensorData: !!req.body.sensorBuffer
       });
 
       const assessmentData = req.body;
@@ -27,11 +30,84 @@ export const gaitAnalysisController = {
         });
       }
 
-      const result = await gaitAnalysisService.saveAssessment(assessmentData);
+      // Process sensor data if provided
+      let hybridMetrics = assessmentData.metrics;
+      if (assessmentData.sensorBuffer && Array.isArray(assessmentData.sensorBuffer)) {
+        console.log('🔬 Processing sensor buffer with', assessmentData.sensorBuffer.length, 'samples');
+        console.log('📊 First 3 samples:', JSON.stringify(assessmentData.sensorBuffer.slice(0, 3)));
+        
+        try {
+          // Extract sensor metrics from raw buffer
+          const sensorMetrics = sensorMetricsService.processSensorBuffer(assessmentData.sensorBuffer);
+          
+          console.log('✅ Sensor metrics computed:', {
+            fsrMetrics: sensorMetrics.fsr ? Object.keys(sensorMetrics.fsr) : 'missing',
+            imuMetrics: sensorMetrics.imu ? Object.keys(sensorMetrics.imu) : 'missing',
+            gaitTiming: sensorMetrics.gaitTiming ? Object.keys(sensorMetrics.gaitTiming) : 'missing',
+            abnormalities: sensorMetrics.abnormalities?.length || 0
+          });
+
+          // Merge CV metrics with sensor metrics
+          const merged = hybridMetricsMerger.mergeMetrics(
+            assessmentData.metrics,
+            sensorMetrics
+          );
+
+          // Log abnormalities and recommendations for verification
+          console.log('🚨 Abnormalities detected:', merged.abnormalities?.length || 0, 'flags');
+          console.log('💊 Recommendations generated:', merged.recommendations?.length || 0, 'recommendations');
+          
+          if (merged.abnormalities?.length > 0) {
+            console.log('📌 Abnormalities sample:', JSON.stringify(merged.abnormalities[0]));
+          }
+          if (merged.recommendations?.length > 0) {
+            console.log('📋 Recommendations sample:', JSON.stringify(merged.recommendations[0]));
+          }
+
+          // Add sensor and hybrid metrics to assessment
+          hybridMetrics = {
+            ...assessmentData.metrics,
+            sensorMetrics: sensorMetrics,
+            hybrid: merged.hybrid,
+            insights: merged.insights,
+            abnormalities: merged.abnormalities,
+            summary: merged.summary,
+            recommendations: merged.recommendations,
+            hybridEnabled: true
+          };
+
+          console.log('✅ Hybrid metrics created successfully');
+        } catch (sensorError) {
+          console.error('⚠️ Error processing sensor data:', sensorError.message);
+          console.error('Stack trace:', sensorError.stack);
+          // Continue with CV metrics only if sensor processing fails
+          hybridMetrics = {
+            ...assessmentData.metrics,
+            sensorProcessingError: sensorError.message,
+            hybridEnabled: false
+          };
+        }
+      } else {
+        console.warn('⚠️ No sensor buffer provided or empty');
+        console.warn('   sensorBuffer exists:', !!assessmentData.sensorBuffer);
+        console.warn('   isArray:', Array.isArray(assessmentData.sensorBuffer));
+        if (assessmentData.sensorBuffer) {
+          console.warn('   buffer length:', assessmentData.sensorBuffer.length);
+        }
+      }
+
+      // Save assessment with computed metrics
+      const saveData = {
+        ...assessmentData,
+        metrics: hybridMetrics
+      };
+
+      const result = await gaitAnalysisService.saveAssessment(saveData);
 
       console.log('Gait analysis assessment saved successfully:', {
         id: result.data._id,
-        userId: assessmentData.userId
+        userId: assessmentData.userId,
+        hybridMetricsComputed: !!assessmentData.sensorBuffer
       });
 
       // Return the saved data with ID
@@ -39,8 +115,10 @@ export const gaitAnalysisController = {
         success: true,
         data: {
           ...assessmentData,
+          metrics: hybridMetrics,
           id: result.data._id,
-          savedAt: result.data.createdAt
+          savedAt: result.data.createdAt,
+          hybridEnabled: !!assessmentData.sensorBuffer
         }
       });
 

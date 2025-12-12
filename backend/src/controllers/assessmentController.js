@@ -796,8 +796,10 @@ export const getAiAnalysis = async (req, res) => {
     if (assessments.length < 5) { // If we don't have enough data in the main collection
       console.log('Fetching additional assessments from specialized collections');
       
-      // Define model map for ALL specialized collections
-      const modelMap = {
+      // Collect all promises for fetching from specialized collections (including wordlist/stroop/hyperventilation)
+      const fetchPromises = [];
+
+      const simpleModels = {
         'TREMOR': TremorAssessment,
         'SPEECH_PATTERN': SpeechPatternAssessment,
         'RESPONSE_TIME': ResponseTimeAssessment,
@@ -807,21 +809,107 @@ export const getAiAnalysis = async (req, res) => {
         'GAIT_ANALYSIS': GaitAnalysisAssessment,
         'NECK_MOBILITY': NeckMobilityAssessment
       };
-      
-      // Collect all promises for fetching from specialized collections
-      const fetchPromises = Object.entries(modelMap).map(async ([type, Model]) => {
-        const data = await Model.find({ 
-          userId: userId,
-          status: 'COMPLETED'
-        }).sort({ timestamp: -1 }).lean();
-        
-        // Make sure type is included in each record
-        return data.map(record => ({
-          ...record,
-          type: type
-        }));
-      });
-      
+
+      // Standard collections
+      for (const [type, Model] of Object.entries(simpleModels)) {
+        fetchPromises.push(
+          Model.find({ userId: userId, status: 'COMPLETED' })
+            .sort({ timestamp: -1 })
+            .lean()
+            .then(data => data.map(record => ({ ...record, type })))
+            .catch(err => {
+              console.error(`Error fetching ${type}:`, err);
+              return [];
+            })
+        );
+      }
+
+      // Wordlist (Test + Score)
+      fetchPromises.push(
+        Test.find({ userId: userId })
+          .sort({ startTs: -1, timestamp: -1 })
+          .lean()
+          .then(async tests => {
+            const enriched = await Promise.all(tests.map(async t => {
+              try {
+                const scores = await Score.find({ testId: t._id }).lean();
+                const metricsMap = {};
+                scores.forEach(s => { metricsMap[s.metric] = s.value; });
+                return {
+                  ...t,
+                  type: 'WORD_LIST',
+                  timestamp: t.endTs || t.timestamp || t.startTs,
+                  status: t.status || 'COMPLETED',
+                  metrics: metricsMap
+                };
+              } catch (err) {
+                console.error('Error enriching wordlist scores', err);
+                return {
+                  ...t,
+                  type: 'WORD_LIST',
+                  timestamp: t.endTs || t.timestamp || t.startTs,
+                  status: t.status || 'COMPLETED',
+                  metrics: {}
+                };
+              }
+            }));
+            return enriched;
+          })
+          .catch(err => {
+            console.error('Error fetching wordlist:', err);
+            return [];
+          })
+      );
+
+      // Stroop
+      fetchPromises.push(
+        StroopAssessment.find({ userId: userId })
+          .sort({ timestamp: -1 })
+          .lean()
+          .then(results => results.map(r => ({
+            ...r,
+            type: 'STROOP',
+            metrics: {
+              score: r.score || 0,
+              total: r.total || 0,
+              accuracy: r.accuracy || 0,
+              history: r.history || []
+            }
+          })))
+          .catch(err => {
+            console.error('Error fetching stroop:', err);
+            return [];
+          })
+      );
+
+      // Hyperventilation / Neuro (EpilepsyTest)
+      fetchPromises.push(
+        EpilepsyTest.find({ 
+          $or: [
+            { userId: userId },
+            { userId: new mongoose.Types.ObjectId(userId) }
+          ]
+        })
+          .sort({ startedAt: -1 })
+          .lean()
+          .then(results => results.map(r => ({
+            ...r,
+            type: r.testType === 'neuro' ? 'NEURO' : 'HYPERVENTILATION',
+            timestamp: r.endedAt || r.startedAt,
+            status: r.status || 'completed',
+            metrics: {
+              baseline_hr: r.summaryMetrics?.baselineHR || 0,
+              hv_hr: r.summaryMetrics?.hvHR || 0,
+              recovery_hr: r.summaryMetrics?.recoveryHR || 0,
+              hv_response: 'Normal'
+            }
+          })))
+          .catch(err => {
+            console.error('Error fetching hyperventilation/neuro:', err);
+            return [];
+          })
+      );
+
       // Wait for all queries to complete
       const specializedResults = await Promise.all(fetchPromises);
       

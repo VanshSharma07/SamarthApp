@@ -80,7 +80,40 @@ const gaitAnalysisSchema = new mongoose.Schema({
         ankleAngles: [Number]
       },
       symmetryData: [Number]
-    }
+    },
+    // Hybrid metrics from sensor + CV fusion
+    hybrid: {
+      jointAngles: mongoose.Schema.Types.Mixed,
+      gaitTiming: mongoose.Schema.Types.Mixed,
+      balance: mongoose.Schema.Types.Mixed,
+      stability: mongoose.Schema.Types.Mixed,
+      symmetry: mongoose.Schema.Types.Mixed,
+      pressure: mongoose.Schema.Types.Mixed,
+      posture: mongoose.Schema.Types.Mixed,
+      armSwing: mongoose.Schema.Types.Mixed,
+      stepCharacteristics: mongoose.Schema.Types.Mixed
+    },
+    // Sensor-specific metrics (FSR, IMU)
+    sensorMetrics: {
+      fsr: mongoose.Schema.Types.Mixed,
+      imu: mongoose.Schema.Types.Mixed,
+      gaitTiming: mongoose.Schema.Types.Mixed,
+      stability: mongoose.Schema.Types.Mixed,
+      pressureDistribution: mongoose.Schema.Types.Mixed,
+      abnormalities: [mongoose.Schema.Types.Mixed],
+      totalDuration: Number,
+      sampleCount: Number
+    },
+    // Insights generated from hybrid metrics
+    insights: [mongoose.Schema.Types.Mixed],
+    // Abnormalities detected (FoG, festination, asymmetry, etc.)
+    abnormalities: [mongoose.Schema.Types.Mixed],
+    // Clinical recommendations (priority-ranked)
+    recommendations: [mongoose.Schema.Types.Mixed],
+    // Summary text and overall assessment
+    summary: mongoose.Schema.Types.Mixed,
+    // Flag indicating if hybrid metrics were computed
+    hybridEnabled: Boolean
   }
 }, {
   timestamps: true
