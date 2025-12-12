@@ -120,7 +120,7 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
       'wordlist': 'Word List Memory Test',
       'word_list': 'Word List Memory Test',
       'stroop': 'Stroop Test',
-      'neuro': 'Neuro (EEG/ECG) Assessment',
+      // 'neuro': 'Neuro (EEG/ECG) Assessment',
       'hyperventilation': 'Hyperventilation Response Test'
     };
     
@@ -153,8 +153,8 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
         return renderWordListMetrics();
       case 'stroop':
         return renderStroopMetrics();
-      case 'neuro':
-        return renderNeuroMetrics();
+      // case 'neuro':
+      //   return renderNeuroMetrics();
       case 'hyperventilation':
         return renderHyperventilationMetrics();
       default:

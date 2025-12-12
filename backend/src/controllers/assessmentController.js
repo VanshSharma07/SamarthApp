@@ -13,12 +13,12 @@ import Score from '../models/Score.js';
 import EpilepsyTest from '../models/EpilepsyTest.js';
 import AssessmentSession from '../models/AssessmentSession.js';
 import { generateReport } from '../services/reportService.js';
-import { getAiPrediction } from '../services/aiService.js';
+import { getAiPrediction, getAiAnalysisResults, getAiAnalysisFromPdf } from '../services/aiService.js';
 import mongoose from 'mongoose';
 import pdf from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import { getAiAnalysisResults } from '../services/aiService.js';
+import pdfParse from 'pdf-parse';
 
 export const getBaselineData = async (req, res) => {
   try {
@@ -772,6 +772,31 @@ export const generatePdfReport = async (req, res) => {
 };
 
 // Get AI analysis
+export const analyzePdfAi = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'PDF file is required (field name: file)' });
+    }
+
+    console.log('Received PDF for AI analysis. Size:', req.file.size);
+
+    // Parse PDF text
+    const parsed = await pdfParse(req.file.buffer);
+    const pdfText = parsed.text || '';
+
+    if (!pdfText || pdfText.trim().length < 50) {
+      return res.status(400).json({ message: 'PDF content is too short to analyze' });
+    }
+
+    // Run AI analysis on extracted text
+    const aiResults = await getAiAnalysisFromPdf(pdfText);
+    return res.status(200).json(aiResults);
+  } catch (error) {
+    console.error('Failed to perform AI PDF analysis:', error);
+    res.status(500).json({ message: 'Failed to analyze PDF', error: error.message });
+  }
+};
+
 export const getAiAnalysis = async (req, res) => {
   try {
     const { userId } = req.params;

@@ -114,7 +114,7 @@ const FingerTapping = ({ userId, onComplete }) => {
   const metricsAnalyzer = useRef(new FingerTapMetricsAnalyzer());
   const analysisRef = useRef(null);
   const timerRef = useRef(null);
-  const [timeRemaining, setTimeRemaining] = useState(30);
+  const [timeRemaining, setTimeRemaining] = useState(15);
   const [saveStatus, setSaveStatus] = useState({ saving: false, error: null, success: false });
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [actualStartTime, setActualStartTime] = useState(null);
@@ -794,7 +794,7 @@ const FingerTapping = ({ userId, onComplete }) => {
           </Typography>
           <Alert severity="info">
             Position your hand clearly in view of the camera, with your palm facing the camera.
-            Tap your index finger and thumb together repeatedly for 30 seconds.
+            Tap your index finger and thumb together repeatedly for 15 seconds.
           </Alert>
         </Box>
       }

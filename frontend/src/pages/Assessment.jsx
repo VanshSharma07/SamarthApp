@@ -43,7 +43,7 @@ import GaitAnalysis from '../components/assessments/GaitAnalysis';
 import FingerTapping from '../components/assessments/FingerTapping';
 import SpeechPatternAssessment from '../components/assessments/SpeechPatternAssessment';
 import WordListAssessment from '../components/assessments/WordList/WordListAssessment';
-import NeuroAssessment from './NeuroAssessment';
+// import NeuroAssessment from './NeuroAssessment';
 import HyperventilationResponseTest from './Hyperventilation/HyperventilationResponseTest';
 import StroopTest from '../components/assessments/AlzehmierStrooptest/StroopTest';
 import BotScreen from '../conversationalBot/pages/BotScreen';
@@ -186,6 +186,7 @@ const Assessment = () => {
       color: '#8e24aa'
     }
     ,
+    /*
     {
       id: 'neuro',
       title: 'Neuro (EEG/ECG) Assessment',
@@ -195,6 +196,7 @@ const Assessment = () => {
       route: '/assessment/neuro',
       color: '#F57C00'
     }
+    */
   ,
     {
       id: 'hyperventilation',
@@ -237,7 +239,7 @@ const Assessment = () => {
     ],
     epilepsy: [
       'eyeMovement',
-      'neuro',
+      // 'neuro',
       'hyperventilation'
     ],
     alzheimers: [

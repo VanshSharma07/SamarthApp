@@ -161,9 +161,9 @@ const GuidancePanel = ({ onStartAssessment }) => {
       icon: '🗣️'
     },
     {
-      title: 'Three assessment rounds',
-      description: 'You will read three different phrases (10 seconds each) for accurate analysis',
-      icon: '🔄'
+      title: 'Single assessment round',
+      description: 'You will read one phrase for about 10 seconds for rapid analysis',
+      icon: '⚡'
     }
   ];
 
@@ -245,8 +245,8 @@ const SpeechPatternAssessment = ({ userId, onComplete }) => {
   const [canComplete, setCanComplete] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
-  const [sampleCount, setSampleCount] = useState(1); // Track multiple samples for accuracy
-  const MAX_SAMPLES = 3; // Collect 3 samples for better accuracy
+  const [sampleCount, setSampleCount] = useState(1); // Single sample for demo
+  const MAX_SAMPLES = 1; // Only one sample in this demo
   const [allMetrics, setAllMetrics] = useState([]); // Store all metrics from all samples
   const [visualizationData, setVisualizationData] = useState({
     waveform: null,
@@ -265,16 +265,6 @@ const SpeechPatternAssessment = ({ userId, onComplete }) => {
       text: "Today is a sunny day outside",
       instruction: "Read this sentence naturally",
       difficulty: "Neutral sentence"
-    },
-    {
-      text: "I enjoy listening to music in my free time",
-      instruction: "Read with natural expression",
-      difficulty: "Complex sentence"
-    },
-    {
-      text: "Please count from one to ten slowly",
-      instruction: "Count at a comfortable pace",
-      difficulty: "Sequential counting"
     }
   ];
 
@@ -425,32 +415,15 @@ const floatTo16BitPCM = (view, offset, input) => {
                 hesitation: results.metrics.timeSeries?.hesitation || []
               }
             };
-
-            // Store this sample's metrics
-            const updatedAllMetrics = [...allMetrics, newMetrics];
+            // Single-sample flow: store metrics and move to results
+            const updatedAllMetrics = [newMetrics];
             setAllMetrics(updatedAllMetrics);
-
-            // If we have multiple samples, average them for better accuracy
-            if (sampleCount < MAX_SAMPLES) {
-              // Reset state for next sample
-              setCurrentPhrase((sampleCount) % 3); // Cycle through phrases
-              setSampleCount(sampleCount + 1);
-              setMetrics(newMetrics); // Show current metrics
-              setRetryCount(0);
-              setIsAssessing(false); // Reset assessing state
-              setTimeRemaining(10); // Reset timer for next sample
-              setCurrentPhase(PHASE.GUIDANCE); // Go back to guidance for next phrase
-              setIsAnalyzing(false);
-            } else {
-              // All samples collected - calculate average metrics
-              const averagedMetrics = averageMetrics(updatedAllMetrics);
-              setMetrics(averagedMetrics);
-              setCanComplete(true);
-              setRetryCount(0);
-              setIsAssessing(false); // Reset assessing state
-              setCurrentPhase(PHASE.RESULTS);
-              setIsAnalyzing(false);
-            }
+            setMetrics(newMetrics);
+            setCanComplete(true);
+            setRetryCount(0);
+            setIsAssessing(false); // Reset assessing state
+            setCurrentPhase(PHASE.RESULTS);
+            setIsAnalyzing(false);
           } else {
             throw new Error(results.error || 'Analysis failed');
           }

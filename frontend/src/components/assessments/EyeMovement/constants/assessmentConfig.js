@@ -1,12 +1,12 @@
 export const ASSESSMENT_PHASES = {
   CALIBRATION: {
-    duration: 5000,
+    duration: 3000,
     instruction: "Look straight ahead and keep your head still",
     type: "calibration",
     pattern: "center"
   },
   SACCADIC_TEST: {
-    duration: 15000,
+    duration: 6000,
     instruction: "Follow the jumping dot quickly as it appears",
     type: "saccadic",
     pattern: [
@@ -15,13 +15,13 @@ export const ASSESSMENT_PHASES = {
     ]
   },
   PURSUIT_TEST: {
-    duration: 15000,
+    duration: 6000,
     instruction: "Follow the moving dot smoothly",
     type: "pursuit",
     pattern: "circular"
   },
   FIXATION_TEST: {
-    duration: 10000,
+    duration: 3000,
     instruction: "Focus on the central dot without moving your eyes",
     type: "fixation",
     pattern: "center"

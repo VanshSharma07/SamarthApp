@@ -782,3 +782,177 @@ function extractOverallAssessment(text) {
     return "Based on the assessment data, no clear overall assessment could be extracted.";
   }
 }
+
+// New function to analyze PDF text for neurological disorders
+export const getAiAnalysisFromPdf = async (pdfText) => {
+  try {
+    if (!pdfText || pdfText.trim().length === 0) {
+      throw new Error('PDF text content is empty');
+    }
+
+    console.log('Starting PDF text analysis. Text length:', pdfText.length);
+
+    // Create a prompt specifically for PDF analysis
+    const prompt = `You are a clinical AI assistant analyzing a patient medical report. Extract and assess indicators for Parkinson's disease, Alzheimer's disease, and Epilepsy.
+
+Based on the following medical report, provide ONLY valid JSON output with NO additional text or explanation. The JSON must be syntactically valid.
+
+Return EXACTLY this JSON structure with no markdown formatting, no explanation text before or after, and no code blocks:
+
+{
+  "parkinsonsDisease": {
+    "riskLevel": "low|moderate|high",
+    "indicators": ["indicator 1", "indicator 2", "indicator 3"],
+    "recommendations": ["recommendation 1", "recommendation 2"]
+  },
+  "alzheimersDisease": {
+    "riskLevel": "low|moderate|high",
+    "indicators": ["indicator 1", "indicator 2", "indicator 3"],
+    "recommendations": ["recommendation 1", "recommendation 2"]
+  },
+  "epilepsy": {
+    "riskLevel": "low|moderate|high",
+    "indicators": ["indicator 1", "indicator 2", "indicator 3"],
+    "recommendations": ["recommendation 1", "recommendation 2"]
+  },
+  "overallAssessment": "Brief summary of findings",
+  "disclaimerNote": "This is an automated AI analysis and should not replace professional medical diagnosis."
+}
+
+MEDICAL REPORT:
+${pdfText}`;
+
+    console.log('Making LLM API call with PDF-based prompt');
+
+    // Make API call to LLM Worker API
+    const response = await axios.post(
+      LLM_API_URL,
+      {
+        messages: [
+          { role: "system", content: prompt }
+        ]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': LLM_API_KEY
+        },
+        timeout: 60000,
+        maxRedirects: 5
+      }
+    );
+
+    console.log('LLM API response received with status:', response.status);
+
+    // Extract text from response
+    let text;
+    if (response.data.output) {
+      text = response.data.output;
+    } else if (response.data.choices && response.data.choices[0]) {
+      text = response.data.choices[0].message?.content || response.data.choices[0].text;
+    } else if (response.data.content) {
+      text = response.data.content;
+    } else if (response.data.result) {
+      text = response.data.result;
+    } else if (typeof response.data === 'string') {
+      text = response.data;
+    } else {
+      console.error('Unexpected response format:', JSON.stringify(response.data).substring(0, 500));
+      throw new Error('Unexpected API response format');
+    }
+
+    if (!text) {
+      console.error('Failed to extract text from response');
+      throw new Error('No content in API response');
+    }
+
+    // Ensure text is a string
+    if (typeof text !== 'string') {
+      console.log('Converting response to string. Original type:', typeof text);
+      text = JSON.stringify(text);
+    }
+
+    // Extract JSON from markdown code blocks if present
+    if (text.includes('```json')) {
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        text = jsonMatch[1];
+        console.log('Extracted JSON from markdown code block');
+      }
+    } else if (text.includes('```')) {
+      const jsonMatch = text.match(/```\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        text = jsonMatch[1];
+        console.log('Extracted JSON from code block');
+      }
+    }
+
+    console.log('Response text length:', text.length);
+    console.log('Response preview:', text.substring(0, 100).replace(/\n/g, '\\n'));
+
+    // Parse the JSON response
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(text);
+      console.log('Successfully parsed JSON response from PDF analysis');
+    } catch (parseError) {
+      console.error('Failed to parse JSON from response:', parseError.message);
+      console.log('Attempting to extract JSON from mixed text response...');
+      
+      // Try to extract JSON object from the text (handles "Here is... {JSON}" format)
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          // Try to parse the extracted JSON
+          parsedResponse = JSON.parse(jsonMatch[0]);
+          console.log('Successfully extracted and parsed JSON from mixed response');
+        } catch (innerError) {
+          console.error('Failed to parse extracted JSON:', innerError.message);
+          console.log('Sample of extracted text:', jsonMatch[0].substring(0, 200));
+          
+          // Last resort: try to clean and repair the JSON
+          let cleanedJson = jsonMatch[0];
+          
+          // Remove trailing commas before closing braces/brackets
+          cleanedJson = cleanedJson.replace(/,(\s*[}\]])/g, '$1');
+          
+          // Try one more time with cleaned JSON
+          try {
+            parsedResponse = JSON.parse(cleanedJson);
+            console.log('Successfully parsed cleaned JSON after removing trailing commas');
+          } catch (finalError) {
+            console.error('Final JSON parsing attempt failed:', finalError.message);
+            // Fall back to response parsing
+            parsedResponse = parseAiResponse(text);
+          }
+        }
+      } else {
+        console.log('No JSON structure found in response, falling back to text parsing');
+        // Try to extract key information even if JSON parsing fails
+        parsedResponse = parseAiResponse(text);
+      }
+    }
+
+    return {
+      success: true,
+      data: parsedResponse,
+      message: 'PDF analysis completed successfully'
+    };
+  } catch (error) {
+    console.error('Error in getAiAnalysisFromPdf:', error);
+
+    if (error.response) {
+      console.error('API Error details:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+    }
+
+    return {
+      success: false,
+      error: error.message,
+      message: 'Failed to analyze PDF'
+    };
+  }
+};

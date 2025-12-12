@@ -33,7 +33,7 @@ const FingerTappingTest = () => {
   // Test state
   const [isTestRunning, setIsTestRunning] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const [testTime, setTestTime] = useState(10); // 10 seconds test duration
+  const [testTime, setTestTime] = useState(15); // 15 seconds test duration
   const [elapsedTime, setElapsedTime] = useState(0);
   const [tapCount, setTapCount] = useState(0);
   const [tapSpeed, setTapSpeed] = useState(0);

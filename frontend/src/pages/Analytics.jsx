@@ -134,7 +134,7 @@ const Analytics = () => {
       wordlist: "Word List Memory Test",
       word_list: "Word List Memory Test",
       stroop: "Stroop Test",
-      neuro: "Neuro (EEG/ECG) Assessment",
+      // neuro: "Neuro (EEG/ECG) Assessment",
       hyperventilation: "Hyperventilation Response Test"
     };
 

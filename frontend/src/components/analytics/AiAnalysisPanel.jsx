@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Box, Typography, Paper, CircularProgress, Alert, Grid, Chip, Divider, List, ListItem, ListItemText, ListItemIcon, Button, Snackbar } from '@mui/material';
-import { fetchAiAnalysis } from '../../services/assessmentService';
+import { Box, Typography, Paper, CircularProgress, Alert, Grid, Chip, Divider, List, ListItem, ListItemText, ListItemIcon, Button, Snackbar, Input } from '@mui/material';
+import { fetchAiAnalysis, uploadPdfForAnalysis } from '../../services/assessmentService';
 import WarningIcon from '@mui/icons-material/Warning';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import RecommendIcon from '@mui/icons-material/Recommend';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { exportAiAnalysisToPdf } from '../../utils/pdfExport';
 
 const AiAnalysisPanel = ({ userId, patientName = 'Patient' }) => {
@@ -14,6 +15,7 @@ const AiAnalysisPanel = ({ userId, patientName = 'Patient' }) => {
   const [error, setError] = useState(null);
   const [aiResults, setAiResults] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [pdfFile, setPdfFile] = useState(null);
 
   const handleAnalyzeReport = async () => {
     try {
@@ -39,6 +41,51 @@ const AiAnalysisPanel = ({ userId, patientName = 'Patient' }) => {
       setSnackbar({
         open: true,
         message: 'Analysis failed',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handlePdfUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+      setError('Please select a PDF file');
+      setSnackbar({
+        open: true,
+        message: 'Only PDF files are allowed',
+        severity: 'error'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setPdfFile(file);
+      console.log('Uploading PDF for AI analysis:', file.name);
+      
+      const results = await uploadPdfForAnalysis(userId, file);
+      console.log('PDF AI analysis results received:', results ? 'yes' : 'no');
+      setAiResults(results);
+      setLoading(false);
+      
+      setSnackbar({
+        open: true,
+        message: 'PDF analysis completed successfully',
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error uploading PDF for analysis:', err);
+      setError('Failed to analyze PDF: ' + (err.message || 'Unknown error'));
+      setLoading(false);
+      setPdfFile(null);
+      
+      setSnackbar({
+        open: true,
+        message: 'PDF analysis failed',
         severity: 'error'
       });
     }
@@ -151,17 +198,35 @@ const AiAnalysisPanel = ({ userId, patientName = 'Patient' }) => {
           AI Analysis
         </Typography>
         
-        <Box sx={{ display: 'flex', gap: 2 }}>
+      <Box sx={{ display: 'flex', gap: 2 }}>
           {!loading && !aiResults && (
-            <Button 
-              variant="contained" 
-              color="primary" 
-              startIcon={<AnalyticsIcon />}
-              onClick={handleAnalyzeReport}
-              disabled={loading}
-            >
-              Analyse Report with AI
-            </Button>
+            <>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                startIcon={<AnalyticsIcon />}
+                onClick={handleAnalyzeReport}
+                disabled={loading}
+              >
+                Analyse Report with AI
+              </Button>
+              
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<CloudUploadIcon />}
+                component="label"
+                disabled={loading}
+              >
+                Upload PDF
+                <Input
+                  hidden
+                  accept=".pdf"
+                  type="file"
+                  onChange={handlePdfUpload}
+                />
+              </Button>
+            </>
           )}
           
           {aiResults && (

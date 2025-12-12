@@ -477,6 +477,41 @@ export const fetchAiAnalysis = async (userId) => {
   }
 };
 
+// Upload PDF for AI analysis
+export const uploadPdfForAnalysis = async (userId, pdfFile) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', pdfFile);
+
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_BASE_URL}/assessments/${userId}/analyze-pdf`,
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+
+    console.log('PDF analysis response:', response.data);
+    
+    // Extract the data payload from the response
+    // Response structure: { success: true, data: {...}, message: "..." }
+    // Return just the data portion for the component
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    
+    // Fallback in case structure is different
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading PDF for analysis:', error);
+    throw error;
+  }
+};
+
 // Get baseline data for an assessment type
 export const getBaselineData = async (type, userId) => {
   try {
