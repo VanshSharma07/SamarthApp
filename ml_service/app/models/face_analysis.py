@@ -30,15 +30,15 @@ class FaceAnalyzer:
         self.LEFT_EYEBROW = [70, 63, 105, 66, 107, 55, 65, 52, 53, 46]
         self.RIGHT_EYEBROW = [336, 296, 334, 293, 300, 285, 295, 282, 283, 276]
         
-        # Define facial midline landmarks
-        self.MIDLINE_POINTS = [8, 6, 5, 4, 1, 168, 197, 195]
+        # Define facial midline landmarks - using more stable points (forehead, between eyes, chin)
+        self.MIDLINE_POINTS = [10, 168, 6, 152]
         
         # For neurological indicators from facial analysis
         self.neuro_indicators = {
-            "asymmetry_threshold": 0.25,  # Higher threshold indicates potential neurological issue
-            "eye_movement_threshold": 0.15,
-            "mouth_deviation_threshold": 0.2,
-            "blink_rate_range": (8, 21)  # Normal blink rate per minute
+            "asymmetry_threshold": 0.20,  # Lowered for higher sensitivity
+            "eye_movement_threshold": 0.12,
+            "mouth_deviation_threshold": 0.15,
+            "blink_rate_range": (8, 21)
         }
 
     def analyze_symmetry(self, image: np.ndarray) -> Dict[str, Any]:
@@ -76,22 +76,44 @@ class FaceAnalyzer:
             # Calculate midline of the face
             midline = self._calculate_face_midline(landmarks, self.MIDLINE_POINTS, width, height)
             
-            # Calculate symmetry metrics with enhanced algorithms
-            eye_symmetry, eye_metrics = self._calculate_enhanced_eye_symmetry(processed_landmarks, midline)
-            mouth_symmetry, mouth_metrics = self._calculate_enhanced_mouth_symmetry(processed_landmarks, midline)
-            jaw_symmetry, jaw_metrics = self._calculate_enhanced_jaw_symmetry(processed_landmarks, midline)
-            eyebrow_symmetry, eyebrow_metrics = self._calculate_eyebrow_symmetry(processed_landmarks, midline)
+            # Calculate rotation angle to align midline vertically
+            # Use points 10 (top) and 152 (chin) for a stable tilt assessment
+            top_pt = landmarks[10]
+            bottom_pt = landmarks[152]
+            dy = (bottom_pt.y - top_pt.y) * height
+            dx = (bottom_pt.x - top_pt.x) * width
+            tilt_angle = np.degrees(np.arctan2(dx, dy))
             
-            # Calculate facial tilt and orientation
-            tilt_angle = self._calculate_face_tilt(processed_landmarks)
+            # Rotation center (point between eyes)
+            center_idx = 168
+            rotation_center = (
+                int(landmarks[center_idx].x * width),
+                int(landmarks[center_idx].y * height)
+            )
             
-            # Calculate overall symmetry score (0-100) with weighted components
-            # Weight asymmetry of different features based on neurological significance
+            # Normalize landmarks by rotating to horizontal (remove tilt)
+            rotated_landmarks = self._rotate_points(processed_landmarks, rotation_center, -tilt_angle)
+            
+            # Recalculate a vertical midline for the rotated coordinates
+            vertical_midline = {
+                "top": {"x": rotation_center[0], "y": 0},
+                "bottom": {"x": rotation_center[0], "y": height},
+                "slope": 0.0,
+                "intercept": float(rotation_center[0])
+            }
+            
+            # Calculate symmetry metrics on ROTATED landmarks for vertical accuracy
+            eye_symmetry, eye_metrics = self._calculate_enhanced_eye_symmetry(rotated_landmarks, vertical_midline)
+            mouth_symmetry, mouth_metrics = self._calculate_enhanced_mouth_symmetry(rotated_landmarks, vertical_midline)
+            jaw_symmetry, jaw_metrics = self._calculate_enhanced_jaw_symmetry(rotated_landmarks, vertical_midline)
+            eyebrow_symmetry, eyebrow_metrics = self._calculate_eyebrow_symmetry(rotated_landmarks, vertical_midline)
+            
+            # Calculate overall symmetry score (0-100)
             weights = {
-                "eye": 0.35,       # Eyes are significant indicators
-                "mouth": 0.25,     # Mouth asymmetry is important
-                "jaw": 0.2,        # Jawline can show asymmetry 
-                "eyebrow": 0.2     # Eyebrow asymmetry can be significant
+                "eye": 0.35,
+                "mouth": 0.30,     # Increased mouth weight
+                "jaw": 0.15,
+                "eyebrow": 0.20
             }
             
             symmetry_score = (
@@ -106,7 +128,7 @@ class FaceAnalyzer:
                 eye_metrics, mouth_metrics, jaw_metrics, eyebrow_metrics
             )
             
-            # Generate a visualization of the analysis
+            # Visualization uses original midline but analyzed scores come from rotated data
             visualization = self._create_visualization(image, processed_landmarks, midline)
             
             return {
@@ -147,6 +169,32 @@ class FaceAnalyzer:
             }
             for idx in indices
         ]
+
+    def _rotate_points(self, landmarks_dict, center, angle_deg):
+        """Rotate all landmarks around a center point to normalize tilt."""
+        angle_rad = np.radians(angle_deg)
+        cos_val = np.cos(angle_rad)
+        sin_val = np.sin(angle_rad)
+        
+        rotated_dict = {}
+        for feature, points in landmarks_dict.items():
+            rotated_points = []
+            for p in points:
+                # Relative to center
+                x = p["x"] - center[0]
+                y = p["y"] - center[1]
+                
+                # Standard 2D rotation
+                nx = x * cos_val - y * sin_val
+                ny = x * sin_val + y * cos_val
+                
+                rotated_points.append({
+                    "x": int(nx + center[0]),
+                    "y": int(ny + center[1]),
+                    "z": p["z"]
+                })
+            rotated_dict[feature] = rotated_points
+        return rotated_dict
 
     def _calculate_face_midline(self, landmarks, midline_indices, width, height):
         """Calculate the vertical midline of the face."""
@@ -506,54 +554,56 @@ class FaceAnalyzer:
         # Bell's palsy indicator (facial nerve paralysis)
         droop_ratio = mouth_metrics["droop_ratio"]
         eye_size_ratio = min(eye_metrics["left_eye_size"], eye_metrics["right_eye_size"]) / max(eye_metrics["left_eye_size"], eye_metrics["right_eye_size"]) if max(eye_metrics["left_eye_size"], eye_metrics["right_eye_size"]) > 0 else 1
+        eyebrow_symmetry = eyebrow_metrics["vertical_alignment"]["symmetry"]
+        corner_symmetry = mouth_metrics["corner_alignment"]
         
-        bells_palsy_score = (droop_ratio * 0.6) + ((1 - eye_size_ratio) * 0.4)
+        # Weighted combination for Bell's palsy (droop and closure are key)
+        # Increased sensitivity to droop and corner misalignment
+        bells_palsy_score = (
+            (droop_ratio * 0.45) + 
+            ((1 - eye_size_ratio) * 0.25) + 
+            ((1 - corner_symmetry) * 0.20) +
+            ((1 - eyebrow_symmetry) * 0.10)
+        )
+        
         bells_palsy_risk = "low"
-        
-        if bells_palsy_score > 0.4:
+        if bells_palsy_score > 0.35: # Lowered thresholds
             bells_palsy_risk = "high"
-        elif bells_palsy_score > 0.25:
+        elif bells_palsy_score > 0.18:
             bells_palsy_risk = "moderate"
             
         indicators["bells_palsy"] = {
-            "score": float(bells_palsy_score),
+            "score": float(bells_palsy_score * 100),
             "risk": bells_palsy_risk
         }
         
-        # Stroke indicator (one-sided facial weakness)
+        # Stroke indicator (one-sided facial weakness, often spares upper face/eyebrow)
         mouth_deviation = mouth_metrics["normalized_deviation"]
-        eyebrow_height_ratio = eyebrow_metrics["heights"]["ratio"]
         
-        stroke_score = (mouth_deviation * 0.4) + ((1 - eyebrow_height_ratio) * 0.3) + ((1 - eye_size_ratio) * 0.3)
+        stroke_score = (mouth_deviation * 0.5) + ((1 - eye_size_ratio) * 0.3) + ((1 - corner_symmetry) * 0.2)
         stroke_risk = "low"
         
-        if stroke_score > 0.4:
+        if stroke_score > 0.35:
             stroke_risk = "high"
-        elif stroke_score > 0.25:
+        elif stroke_score > 0.18:
             stroke_risk = "moderate"
             
         indicators["stroke"] = {
-            "score": float(stroke_score),
+            "score": float(stroke_score * 100),
             "risk": stroke_risk
         }
         
         # Parkinson's indicator (reduced facial expressiveness, symmetry usually less affected)
-        # Use a better calculation based on research
-        # Values should be consistent with risk assessment
-        parkinsons_score = 0.0
-        
-        # Calculate Parkinson's score using relevant metrics
-        # Higher score = higher risk, scale from 0-1 (multiply by 100 for percentage)
         mouth_symmetry = 1 - mouth_metrics["normalized_deviation"]
         eye_movement = eye_metrics["vertical_alignment"]
+        eyebrow_height_ratio = eyebrow_metrics["heights"]["ratio"]
         
         # In Parkinson's, hypomimia (facial masking) is common
-        # We need to detect reduced facial movement/expression
         parkinsons_score = (
             (0.4 * (1 - mouth_symmetry)) +  # Reduced mouth movement
             (0.3 * (1 - eye_movement)) +     # Reduced eye expressiveness
             (0.3 * (1 - eyebrow_height_ratio))  # Reduced eyebrow movement
-        ) * 0.7  # Scale factor to align with other scores
+        ) * 0.7
         
         # Proper risk categorization for Parkinson's
         parkinsons_risk = "low"
@@ -563,7 +613,7 @@ class FaceAnalyzer:
             parkinsons_risk = "moderate"
             
         indicators["parkinsons"] = {
-            "score": float(parkinsons_score),
+            "score": float(parkinsons_score * 100),
             "risk": parkinsons_risk
         }
         
@@ -591,7 +641,7 @@ class FaceAnalyzer:
             overall_risk = "moderate"
         
         indicators["overall"] = {
-            "score": float(overall_score),
+            "score": float(overall_score * 100),
             "risk": overall_risk
         }
         

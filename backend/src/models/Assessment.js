@@ -19,7 +19,8 @@ const assessmentSchema = new mongoose.Schema({
       'RESPONSE_TIME',
       'SPEECH_PATTERN',
       'FINGER_TAPPING',
-      'HYPERVENTILATION_TEST'
+      'HYPERVENTILATION_TEST',
+      'CONVERSATIONAL_SCREENING'
     ]
   },
   timestamp: {

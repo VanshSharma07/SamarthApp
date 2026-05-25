@@ -121,7 +121,8 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
       'word_list': 'Word List Memory Test',
       'stroop': 'Stroop Test',
       // 'neuro': 'Neuro (EEG/ECG) Assessment',
-      'hyperventilation': 'Hyperventilation Response Test'
+      'hyperventilation': 'Hyperventilation Response Test',
+      'neurobot': 'Conversational Screening'
     };
     
     return typeMap[validatedAssessment.type] || validatedAssessment.type;
@@ -157,6 +158,8 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
       //   return renderNeuroMetrics();
       case 'hyperventilation':
         return renderHyperventilationMetrics();
+      case 'neurobot':
+        return renderNeuroBotMetrics();
       default:
         return (
           <Typography color="text.secondary">
@@ -772,6 +775,82 @@ const AssessmentDetailDialog = ({ open, onClose, assessment }) => {
             {validatedAssessment.metrics.recommendedAction || 'N/A'}
           </Typography>
         </Grid>
+      </Grid>
+    );
+  };
+
+  const renderNeuroBotMetrics = () => {
+    const riskLevel = validatedAssessment.metrics.riskLevel || 'Unknown';
+    const summary = validatedAssessment.metrics.summary || 'N/A';
+    const reasoning = validatedAssessment.report?.reasoning || 'N/A';
+    const recommendations = validatedAssessment.report?.recommendations || [];
+
+    return (
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>Risk Level</Typography>
+            <Chip
+              label={riskLevel.toUpperCase()}
+              color={riskLevel === 'high' ? 'error' : riskLevel === 'medium' ? 'warning' : 'success'}
+              sx={{ fontWeight: 'bold' }}
+            />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={8}>
+          <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>Summary</Typography>
+            <Typography variant="body1">{summary}</Typography>
+          </Paper>
+        </Grid>
+        <Grid item xs={12}>
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="subtitle1" gutterBottom sx={{ mt: 2, fontWeight: 'bold' }}>Risk Reasoning</Typography>
+          <Typography variant="body1" paragraph>{reasoning}</Typography>
+        </Grid>
+        
+        {recommendations.length > 0 && (
+          <Grid item xs={12}>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>Recommendations</Typography>
+            <ul>
+              {recommendations.map((rec, i) => (
+                <li key={i}><Typography variant="body1">{rec}</Typography></li>
+              ))}
+            </ul>
+          </Grid>
+        )}
+
+        {validatedAssessment.history && validatedAssessment.history.length > 0 && (
+          <Grid item xs={12}>
+            <Typography variant="subtitle1" gutterBottom sx={{ mt: 2, fontWeight: 'bold' }}>Conversation History</Typography>
+            <Box sx={{ 
+              maxHeight: 400, 
+              overflowY: 'auto', 
+              p: 2, 
+              bgcolor: 'grey.50', 
+              borderRadius: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2
+            }}>
+              {validatedAssessment.history.map((msg, idx) => (
+                <Box key={idx} sx={{ 
+                  alignSelf: msg.from === 'bot' ? 'flex-start' : 'flex-end',
+                  maxWidth: '80%',
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: msg.from === 'bot' ? 'primary.soft' : 'background.paper',
+                  boxShadow: 1
+                }}>
+                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 'bold' }}>
+                    {msg.from === 'bot' ? 'NeuroBot' : 'You'}
+                  </Typography>
+                  <Typography variant="body2">{msg.text}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Grid>
+        )}
       </Grid>
     );
   };

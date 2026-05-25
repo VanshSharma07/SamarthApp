@@ -6,7 +6,9 @@ import ParkinsonQuestionnaire from './ParkinsonQuestionnaire';
 const disorderTitles = {
   parkinsons: "Parkinson's",
   alzheimers: "Alzheimer's",
-  epilepsy: 'Epilepsy'
+  epilepsy: 'Epilepsy',
+  als: 'ALS',
+  'bells-palsy': "Bell's Palsy"
 };
 
 const DisorderQuestionnaire = () => {
@@ -51,8 +53,42 @@ const DisorderQuestionnaire = () => {
             <Typography color="text.secondary">(Placeholder - questions will be supplied)</Typography>
           </Box>
         )}
+        
+        {disorder === 'als' && (
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>ALS Questions</Typography>
+            <Typography color="text.secondary">(Placeholder - questions will be supplied)</Typography>
+            <Button 
+                variant="contained" 
+                sx={{ mt: 2 }}
+                onClick={() => {
+                    localStorage.setItem('als_questionnaire', 'true');
+                    navigate(`/assessment?disorder=als`);
+                }}
+            >
+                Start Assessment
+            </Button>
+          </Box>
+        )}
 
-        {!['parkinsons','alzheimers','epilepsy'].includes(disorder) && (
+        {disorder === 'bells-palsy' && (
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Bell's Palsy Questions</Typography>
+            <Typography color="text.secondary">(Placeholder - questions will be supplied)</Typography>
+            <Button 
+                variant="contained" 
+                sx={{ mt: 2 }}
+                onClick={() => {
+                    localStorage.setItem('bells-palsy_questionnaire', 'true');
+                    navigate(`/assessment?disorder=bells-palsy`);
+                }}
+            >
+                Start Assessment
+            </Button>
+          </Box>
+        )}
+
+        {!['parkinsons','alzheimers','epilepsy', 'als', 'bells-palsy'].includes(disorder) && (
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>No disorder selected</Typography>
             <Typography color="text.secondary">Use the Select Disorder page to choose one.</Typography>

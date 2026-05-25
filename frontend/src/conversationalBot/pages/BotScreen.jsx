@@ -9,13 +9,17 @@ import {
   Typography, 
   useTheme, 
   CircularProgress,
-  Stack
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { Send, Mic, MicOff, CheckCircle } from '@mui/icons-material';
 import ChatBox from '../components/ChatBox';
 import VoiceLottie from '../components/VoiceLottie';
 import MicLottie from '../components/MicLottie';
-import useMic from '../hooks/useBackendMic';
+import useMic from '../hooks/useSpeechRecognition';
 
 import { startBotSession, sendBotAnswer, getBotReport } from '../services/botService';
 
@@ -25,12 +29,12 @@ export default function BotScreen({ onComplete, userId }) {
   const [reportData, setReportData] = useState(null); // Report State
   // ... other states
   const [isBotSpeaking, setIsBotSpeaking] = useState(false);
-  const [currentQuestionType, setCurrentQuestionType] = useState('text'); // text | number | yesno
   const [isFinished, setIsFinished] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [language, setLanguage] = useState('en'); // 'en' | 'hi'
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [voiceGender, setVoiceGender] = useState('female');
   
   const theme = useTheme();
 
@@ -42,49 +46,60 @@ export default function BotScreen({ onComplete, userId }) {
     setMessages((prev) => [...prev, { from: 'user', text }]);
   }
 
-  // Audio Ref for cleanup
-  const audioRef = React.useRef(null);
-
-  // Cleanup audio on unmount
+  // Cleanup speech on unmount
   useEffect(() => {
+    // ensure voices are loaded 
+    window.speechSynthesis.getVoices();
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      window.speechSynthesis.cancel();
     };
   }, []);
 
   // Stop Audio Helper
   const stopAudio = () => {
-    if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current = null;
-    }
+    window.speechSynthesis.cancel();
     setIsBotSpeaking(false);
   };
 
-  // Audio Playback
-  async function playAudio(base64) {
+  // Audio Playback (Web Speech API)
+  const speakText = (text) => {
     stopAudio(); // Stop any previous
 
+    if (!text) return;
+
     setIsBotSpeaking(true);
-    const audio = new Audio(base64);
-    audioRef.current = audio; // Store ref
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
     
-    audio.onended = () => {
+    const voices = window.speechSynthesis.getVoices();
+    const langVoices = voices.filter(v => v.lang.startsWith(language));
+    
+    if (langVoices.length > 0) {
+        let selectedVoice;
+        if (voiceGender === 'female') {
+           selectedVoice = langVoices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('victoria') || v.name.toLowerCase().includes('aditi'));
+           if (!selectedVoice) selectedVoice = langVoices[0];
+        } else {
+           selectedVoice = langVoices.find(v => v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('david') || v.name.toLowerCase().includes('mark') || v.name.toLowerCase().includes('ravi'));
+           if (!selectedVoice) selectedVoice = langVoices.find(v => !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('zira') && !v.name.toLowerCase().includes('samantha') && !v.name.toLowerCase().includes('victoria'));
+           if (!selectedVoice) selectedVoice = langVoices[0];
+        }
+        if (selectedVoice) {
+           msg.voice = selectedVoice;
+        }
+    }
+
+    msg.onend = () => {
         setIsBotSpeaking(false);
-        audioRef.current = null;
     };
     
-    try {
-        await audio.play();
-    } catch (e) {
-        console.error("Audio playback failed", e);
+    msg.onerror = (e) => {
+        console.error("Speech playback failed", e);
         setIsBotSpeaking(false);
-    }
-  }
+    };
+
+    window.speechSynthesis.speak(msg);
+  };
 
   // Handle Response Logic
   async function handleUserResponse(text) {
@@ -110,15 +125,11 @@ export default function BotScreen({ onComplete, userId }) {
 
       if (data.finished) {
         setIsFinished(true);
-        playAudio(data.audio);
+        speakText(data.botText);
         addBot(data.botText);
-        setCurrentQuestionType(null);
       } else {
-        playAudio(data.audio);
+        speakText(data.botText);
         addBot(data.botText);
-        if (data.nextQuestion) {
-          setCurrentQuestionType(data.nextQuestion.type);
-        }
       }
     } catch (err) {
       console.error('Failed to get response:', err);
@@ -129,9 +140,10 @@ export default function BotScreen({ onComplete, userId }) {
   }
 
   // Speech Hook
+  const speechLang = language === 'hi' ? 'hi-IN' : 'en-IN';
   const { listening, startListening, stopListening } = useMic(async (spokenText) => {
     await handleUserResponse(spokenText);
-  });
+  }, speechLang);
 
   const [visualListening, setVisualListening] = useState(false);
 
@@ -146,7 +158,7 @@ export default function BotScreen({ onComplete, userId }) {
     
     let timer;
 
-    if (isBotSpeaking) {
+    if (isBotSpeaking || isFinished) {
       stopListening();
       setVisualListening(false);
     } else {
@@ -156,7 +168,7 @@ export default function BotScreen({ onComplete, userId }) {
         timer = setTimeout(() => {
             startListening();
             setVisualListening(true);
-        }, 800); // 800ms delay for safety
+        }, 300); // 300ms delay for safety
       }
     }
 
@@ -170,6 +182,7 @@ export default function BotScreen({ onComplete, userId }) {
       setVisualListening(false);
       stopListening();
     } else {
+      stopAudio(); // Ensure bot is silenced when mic starts manually
       setVisualListening(true);
       startListening();
     }
@@ -187,13 +200,13 @@ export default function BotScreen({ onComplete, userId }) {
   // Start Session
   async function startSession() {
     try {
-      const data = await startBotSession();
+      const data = await startBotSession(userId);
       setSessionId(data.sessionId);
-      playAudio(data.audio);
+      
+      // Delay speech slightly to ensure rendering catches up for the initial prompt
+      setTimeout(() => speakText(data.botText), 100); 
+
       addBot(data.botText);
-      if (data.question) {
-         setCurrentQuestionType(data.question.type);
-      }
     } catch (error) {
       console.error('Failed to start session:', error);
       addBot("Hello! I am NeuroBot. The server seems to be offline, but you can still chat with me.");
@@ -201,14 +214,21 @@ export default function BotScreen({ onComplete, userId }) {
   }
 
   const handleStart = () => {
+    console.log("[BotScreen] Starting session for user:", userId);
     setHasStarted(true);
     startSession();
   };
 
   const handleFinish = () => {
     if(onComplete) {
-        // Pass back some metrics or just success
-        onComplete({ completed: true, sessionId });
+        // Pass back metrics and report for persistence in Assessment collection
+        onComplete({ 
+            completed: true, 
+            sessionId,
+            riskLevel: reportData?.report?.riskLevel || 'Unknown',
+            summary: reportData?.report?.summary || '',
+            recommendations: reportData?.report?.recommendations || []
+        });
     }
   };
 
@@ -269,6 +289,22 @@ export default function BotScreen({ onComplete, userId }) {
           <VoiceLottie isSpeaking={isBotSpeaking} />
         </Box>
         
+        {/* Voice Gender Switcher */}
+        <Box sx={{ width: '100%', px: 2, mb: 1 }}>
+            <FormControl fullWidth size="small" variant="outlined">
+                <InputLabel sx={{ fontSize: '14px' }}>AI Voice Gender</InputLabel>
+                <Select
+                    value={voiceGender}
+                    label="AI Voice Gender"
+                    onChange={(e) => setVoiceGender(e.target.value)}
+                    sx={{ fontSize: '14px', borderRadius: 3 }}
+                >
+                    <MenuItem value="female">Female</MenuItem>
+                    <MenuItem value="male">Male</MenuItem>
+                </Select>
+            </FormControl>
+        </Box>
+
         {/* Mic Button Area */}
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 0 }}>
             <Box 
@@ -366,33 +402,13 @@ export default function BotScreen({ onComplete, userId }) {
                    </Box>
                )}
              </Box>
-          ) : currentQuestionType === 'yesno' ? (
-            <Stack direction="row" spacing={2} justifyContent="center">
-              <Button 
-                variant="outlined" 
-                size="large" 
-                onClick={() => handleUserResponse(language === 'hi' ? 'हाँ' : 'Yes')}
-                sx={{ minWidth: 120, borderRadius: 3 }}
-              >
-                {language === 'hi' ? 'हाँ (Yes)' : 'Yes'}
-              </Button>
-              <Button 
-                variant="outlined" 
-                size="large" 
-                color="error" // Red-ish for No
-                onClick={() => handleUserResponse(language === 'hi' ? 'नहीं' : 'No')}
-                sx={{ minWidth: 120, borderRadius: 3 }}
-              >
-                {language === 'hi' ? 'नहीं (No)' : 'No'}
-              </Button>
-            </Stack>
           ) : (
             <Box sx={{ display: 'flex', gap: 1 }}>
               <TextField
                 fullWidth
                 variant="outlined"
-                placeholder={currentQuestionType === 'number' ? "Enter number..." : "Type your answer..."}
-                type={currentQuestionType === 'number' ? "number" : "text"}
+                placeholder="Type your answer or tap the mic..."
+                type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleUserResponse(inputText)}

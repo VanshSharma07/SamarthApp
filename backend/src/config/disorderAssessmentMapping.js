@@ -16,6 +16,20 @@ export const DISORDER_CONFIG = {
     key: 'epilepsy',
     label: 'Epilepsy',
     assessments: ['eyeMovement', 'neuro', 'hyperventilation']
+  },
+  als: {
+    key: 'als',
+    label: 'ALS',
+    assessments: [
+      'tremor', 'gaitAnalysis', 'fingerTapping', 'speechPattern', 'responseTime', 'neckMobility', 'facialSymmetry'
+    ]
+  },
+  bellsPalsy: {
+    key: 'bellsPalsy',
+    label: "Bell's Palsy",
+    assessments: [
+      'facialSymmetry', 'speechPattern', 'eyeMovement'
+    ]
   }
 };
 
@@ -45,8 +59,8 @@ export const ASSESSMENT_TYPE_MAP = {
   wordList: ['word_list', 'wordList', 'memory_words', 'wordlist', 'word list', 'wordlist test', 'word_list_test', 'memory test'],
   stroop: ['stroop', 'stroop_test', 'stroop test', 'stroopTest', 'stroop_test_assessment'],
   conversationalScreening: [
-    'conversation', 'conversational', 'conversationalScreening', 'language', 'conversation_screening',
-    'conversational screening', 'conversationalScreeningAssessment', 'language_screening', 'conversational assessment'
+    'conversation', 'conversational', 'conversationalScreening', 'language', 'conversation_screening', 'neurobot',
+    'conversational screening', 'conversationalScreeningAssessment', 'language_screening', 'conversational assessment', 'neurobot assessment'
   ],
   neuro: ['neuro', 'eeg', 'ecg', 'neuro_eeg_ecg', 'neuro test', 'neuro_assessment', 'eeg_ecg', 'neurotest'],
   hyperventilation: [

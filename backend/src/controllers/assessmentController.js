@@ -13,6 +13,7 @@ import Test from '../models/Test.js';
 import Score from '../models/Score.js';
 import EpilepsyTest from '../models/EpilepsyTest.js';
 import AssessmentSession from '../models/AssessmentSession.js';
+import NeuroBotAssessment from '../models/NeuroBotAssessment.js';
 import { generateReport } from '../services/reportService.js';
 import { getAiPrediction, getAiAnalysisResults, getAiAnalysisFromPdf } from '../services/aiService.js';
 import mongoose from 'mongoose';
@@ -207,7 +208,8 @@ export const getAssessmentHistory = async (req, res) => {
         'wordlist': Test,
         'word_list': Test,
         'neuro': EpilepsyTest,
-        'hyperventilation': EpilepsyTest
+        'hyperventilation': EpilepsyTest,
+        'neurobot': NeuroBotAssessment
       };
       
       // If type is specified, only check that model
@@ -460,6 +462,30 @@ export const getAssessmentHistory = async (req, res) => {
             })
         );
         
+        // Add neurobot assessments
+        promises.push(
+          NeuroBotAssessment.find({ userId })
+            .sort({ timestamp: -1 })
+            .limit(parseInt(limit))
+            .lean()
+            .then(results => {
+              console.log(`Found ${results.length} neurobot assessments`);
+              return results.map(r => ({
+                ...r,
+                type: 'neurobot',
+                metrics: {
+                  riskLevel: r.report?.riskLevel || 'Unknown',
+                  summary: r.report?.summary || '',
+                  overallScore: r.report?.riskLevel === 'Low' ? 90 : (r.report?.riskLevel === 'Medium' ? 60 : 30)
+                }
+              }));
+            })
+            .catch(err => {
+              console.error('Error fetching neurobot:', err);
+              return [];
+            })
+        );
+        
         // Wait for all queries to complete
         const results = await Promise.all(promises);
         
@@ -560,7 +586,8 @@ export const getAllAssessments = async (req, res) => {
         'gaitAnalysis': GaitAnalysisAssessment,
         'fingerTapping': FingerTappingAssessment,
         'facialSymmetry': FacialSymmetryAssessment,
-        'eyeMovement': EyeMovementAssessment
+        'eyeMovement': EyeMovementAssessment,
+        'neurobot': NeuroBotAssessment
       };
       
       // Query all specialized collections
@@ -940,6 +967,26 @@ export const getAiAnalysis = async (req, res) => {
           })
       );
 
+      // NeuroBot
+      fetchPromises.push(
+        NeuroBotAssessment.find({ userId: userId })
+          .sort({ timestamp: -1 })
+          .lean()
+          .then(results => results.map(r => ({
+            ...r,
+            type: 'NEUROBOT',
+            metrics: {
+              riskLevel: r.report?.riskLevel || 'Unknown',
+              summary: r.report?.summary || '',
+              overallScore: r.report?.riskLevel === 'Low' ? 90 : (r.report?.riskLevel === 'Medium' ? 60 : 30)
+            }
+          })))
+          .catch(err => {
+            console.error('Error fetching neurobot for AI:', err);
+            return [];
+          })
+      );
+
       // Wait for all queries to complete
       const specializedResults = await Promise.all(fetchPromises);
       
@@ -1054,6 +1101,12 @@ export const addAssessment = async (req, res) => {
         break;
       case 'eyeMovement':
         assessment = new EyeMovementAssessment(assessmentData);
+        break;
+      case 'neurobot':
+        assessment = new NeuroBotAssessment({
+          ...assessmentData,
+          metrics: assessmentData.metrics || {}
+        });
         break;
       default:
         // Also add to the generic Assessment model

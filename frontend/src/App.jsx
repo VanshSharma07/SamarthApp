@@ -40,6 +40,7 @@ import FingerTapping from './components/assessments/FingerTapping';
 import TherapyHome from './therapies/TherapyHome'; // Import TherapyHome
 import BellsPalsyTherapy from './therapies/BellsPalsyTherapy'; // Import dedicated therapy modules
 import ALSTherapy from './therapies/ALSTherapy';
+import FacialSymmetry from './components/assessments/FacialSymmetry';
 import ParkinsonsTherapy from './therapies/parkinsons/ParkinsonsTherapy';
 import GaitBalanceExercise from './therapies/parkinsons/GaitBalanceExercise';
 import FingerTappingTest from './therapies/parkinsons/FingerTappingTest';
@@ -89,6 +90,8 @@ function App() {
             <Route path="/disorders/parkinsons" element={<ProtectedRoute><ParkinsonQuestionnaire /></ProtectedRoute>} />
             <Route path="/disorders/alzheimers" element={<ProtectedRoute><AlzheimerQuestionnaire /></ProtectedRoute>} />
             <Route path="/disorders/epilepsy" element={<ProtectedRoute><EpilepsyQuestionnaire /></ProtectedRoute>} />
+            <Route path="/disorders/als" element={<ProtectedRoute><DisorderQuestionnaire /></ProtectedRoute>} />
+            <Route path="/disorders/bells-palsy" element={<ProtectedRoute><DisorderQuestionnaire /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/diagnostics" element={<ProtectedRoute><Diagnostics /></ProtectedRoute>} />
             <Route path="/about" element={<ProtectedRoute><AboutPage/></ProtectedRoute>} />
@@ -98,7 +101,7 @@ function App() {
             <Route path="/assessment/neck-mobility" element={<ProtectedRoute><NeckMobility /></ProtectedRoute>} />
             <Route path="/assessment/neuro" element={<ProtectedRoute><NeuroAssessment /></ProtectedRoute>} />
             <Route path="/assessment/hyperventilation" element={<ProtectedRoute><HyperventilationResponseTest /></ProtectedRoute>} />
-            {/* Facial Symmetry assessment removed from app routes */}
+            <Route path="/assessment/facial-symmetry" element={<ProtectedRoute><FacialSymmetry /></ProtectedRoute>} />
             <Route path="/assessment/tremor" element={<ProtectedRoute><Tremor /></ProtectedRoute>} />
             <Route path="/assessment/response-time" element={<ProtectedRoute><ResponseTime /></ProtectedRoute>} />
             <Route path="/assessment/gait-analysis" element={<ProtectedRoute><GaitAnalysis /></ProtectedRoute>} />

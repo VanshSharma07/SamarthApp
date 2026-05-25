@@ -1,5 +1,5 @@
 import { Box, Typography, Card, CardContent, Grid } from '@mui/material';
-import { Assessment, Analytics, Info } from '@mui/icons-material';
+import { Assessment, Analytics, Info, AccessibilityNew } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 
@@ -105,6 +105,14 @@ const Home = () => {
               subtitle="Choose an assessment type"
               icon={Assessment}
               onPress={() => navigate('/select-disorder')}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <NavigationCard
+              title="Therapy"
+              subtitle="Start personalized rehabilitation programs"
+              icon={AccessibilityNew}
+              onPress={() => navigate('/therapy')}
             />
           </Grid>
           <Grid item xs={12} md={4}>

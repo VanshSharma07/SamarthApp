@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Grid, Card, CardContent, Typography, Button, useTheme } from '@mui/material';
-import { AccessibilityNew, Psychology, Memory } from '@mui/icons-material';
+import { AccessibilityNew, Psychology, Memory, MedicalServices, Face } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -28,6 +28,20 @@ const disorders = [
     subtitle: 'Seizure monitoring and patterns',
     icon: Psychology,
     color: '#F57C00'
+  },
+  {
+    id: 'als',
+    title: "ALS",
+    subtitle: 'Motor neurone disease, muscle weakness',
+    icon: MedicalServices,
+    color: '#D32F2F'
+  },
+  {
+    id: 'bells-palsy',
+    title: "Bell's Palsy",
+    subtitle: 'Facial muscle weakness or paralysis',
+    icon: Face,
+    color: '#00796B'
   }
 ];
 
@@ -36,8 +50,8 @@ const SelectDisorder = () => {
   const theme = useTheme();
 
   const handleSelect = (id) => {
-    // Navigate directly to the disorder-specific questionnaire page
-    navigate(`/disorders/${encodeURIComponent(id)}`);
+    // Navigate directly to the assessment page, skipping the questionnaire
+    navigate(`/assessment?disorder=${encodeURIComponent(id)}`);
   };
 
   return (
@@ -50,7 +64,7 @@ const SelectDisorder = () => {
           Choose the disorder you want to evaluate. We'll tailor the assessment and recommendations accordingly.
         </Typography>
 
-        <Grid container spacing={3}>
+        <Grid container spacing={3} alignItems="stretch">
           {disorders.map((d, i) => {
             const Icon = d.icon;
             return (
@@ -61,6 +75,9 @@ const SelectDisorder = () => {
                   transition={{ duration: 0.45, delay: i * 0.08 }}
                   sx={{
                     cursor: 'pointer',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
                     borderRadius: 3,
                     overflow: 'hidden',
                     boxShadow: 3,
@@ -70,7 +87,7 @@ const SelectDisorder = () => {
                   onClick={() => handleSelect(d.id)}
                 >
                   <Box sx={{ height: 8, background: d.color }} />
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Box sx={{
                         p: 1.5,

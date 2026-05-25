@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from "react";
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
 
-export default function useMic(onComplete) {
+export default function useMic(onComplete, language = 'en-IN') {
   const { transcript, listening, resetTranscript } = useSpeechRecognition();
 
   useEffect(() => {
@@ -9,12 +9,12 @@ export default function useMic(onComplete) {
       onComplete(transcript.trim());
       resetTranscript();
     }
-  }, [listening]);
+  }, [listening, transcript, onComplete, resetTranscript]);
 
   const startListening = useCallback(() => {
-    console.log("HOOK: startListening called");
-    SpeechRecognition.startListening({ continuous: false, language: "en-IN" });
-  }, []);
+    console.log(`HOOK: startListening called for ${language}`);
+    SpeechRecognition.startListening({ continuous: false, language });
+  }, [language]);
 
   const stopListening = useCallback(() => {
     SpeechRecognition.stopListening();

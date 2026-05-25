@@ -6,9 +6,9 @@ const API_BASE_URL = 'http://localhost:5000/api/neurobot';
  * Starts a new conversational session.
  * @returns {Promise<Object>} The initial session data (sessionId, audio, botText).
  */
-export const startBotSession = async () => {
+export const startBotSession = async (userId) => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/start`);
+    const response = await axios.post(`${API_BASE_URL}/start`, { userId });
     return response.data;
   } catch (error) {
     console.error("Error starting bot session:", error);

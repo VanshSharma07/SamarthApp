@@ -91,7 +91,8 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
       'word_list': 'Word List Memory Test',
       'stroop': 'Stroop Test',
       'neuro': 'Neuro (EEG/ECG) Assessment',
-      'hyperventilation': 'Hyperventilation Response Test'
+      'hyperventilation': 'Hyperventilation Response Test',
+      'neurobot': 'Conversational Screening'
     };
     
     return typeMap[processedAssessment.type] || processedAssessment.type;
@@ -195,6 +196,13 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
         };
       }
       case 'hyperventilation': {
+        const riskLevel = processedAssessment.metrics.riskLevel || 'Unknown';
+        return {
+          label: 'Risk Level',
+          value: riskLevel.toUpperCase()
+        };
+      }
+      case 'neurobot': {
         const riskLevel = processedAssessment.metrics.riskLevel || 'Unknown';
         return {
           label: 'Risk Level',
@@ -382,6 +390,12 @@ const AssessmentCard = ({ assessment, onViewDetails }) => {
           { label: 'Alpha Suppression', value: `${alphaSuppression}%` },
           { label: 'Delta Increase', value: `${deltaIncrease}%` },
           { label: 'Recommended Action', value: processedAssessment.metrics.recommendedAction || 'N/A' }
+        ];
+      }
+      case 'neurobot': {
+        return [
+          { label: 'Summary', value: processedAssessment.metrics.summary || 'N/A' },
+          { label: 'Risk Reasoning', value: processedAssessment.report?.reasoning || 'N/A' }
         ];
       }
       default:

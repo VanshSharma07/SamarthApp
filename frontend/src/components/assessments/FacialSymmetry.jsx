@@ -188,6 +188,47 @@ const FacialSymmetry = ({ userId, onComplete }) => {
       setIsLoading(false);
     }
   };
+
+  // Handle manual image upload
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    setError(null);
+    setCapturedImage(null);
+    setSymmetryData(null);
+    setNeurologicalIndicators(null);
+    setFaceLandmarks(null);
+    stopVideoStream();
+    setIsAssessing(false);
+
+    try {
+      // Create a preview URL for the uploaded image
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCapturedImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+
+      // Analyze the uploaded image
+      console.log('Analyzing uploaded image...');
+      // Note: analyzeFace should handle File/Blob objects
+      const results = await MLService.analyzeFace(file);
+      console.log('Received facial symmetry results:', results);
+
+      if (results.success) {
+        processAnalysisResults(results);
+      } else {
+        setError(results.error || 'No face detected in the uploaded image. Please try another photo.');
+      }
+    } catch (err) {
+      console.error('Error analyzing uploaded file:', err);
+      setError(`Error analyzing uploaded image: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Process facial analysis results
   const processAnalysisResults = (results) => {
@@ -522,7 +563,7 @@ const FacialSymmetry = ({ userId, onComplete }) => {
 
   // Action buttons
   const actions = (
-    <Box sx={{ display: 'flex', gap: 2 }}>
+    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
       {isAssessing && !capturedImage && !isLoading && (
         <Button
           variant="contained"
@@ -531,17 +572,48 @@ const FacialSymmetry = ({ userId, onComplete }) => {
           disabled={isLoading}
           sx={{ minWidth: 150 }}
         >
-          {isLoading ? <CircularProgress size={24} /> : 'Capture'}
+          Capture
         </Button>
       )}
+
+      {!isAssessing && !isLoading && (
+        <>
+          <input
+            type="file"
+            accept="image/*"
+            id="face-upload"
+            style={{ display: 'none' }}
+            onChange={handleFileUpload}
+          />
+          <label htmlFor="face-upload">
+            <Button
+              variant="outlined"
+              component="span"
+              color="primary"
+              sx={{ minWidth: 150 }}
+            >
+              Upload Photo
+            </Button>
+          </label>
+        </>
+      )}
+
       <Button
         variant="contained"
-        color={isAssessing ? 'error' : 'primary'}
-        onClick={isAssessing ? stopAssessment : startAssessment}
+        color={isAssessing ? 'error' : metrics ? 'success' : 'primary'}
+        onClick={isAssessing || (metrics && !isAssessing) ? stopAssessment : startAssessment}
         disabled={isLoading}
-        sx={{ minWidth: 150 }}
+        sx={{ minWidth: 200 }}
       >
-        {isLoading ? <CircularProgress size={24} /> : isAssessing ? 'Stop Assessment' : 'Start Assessment'}
+        {isLoading ? (
+          <CircularProgress size={24} color="inherit" />
+        ) : isAssessing ? (
+          'Stop Camera'
+        ) : metrics ? (
+          'Save & Complete'
+        ) : (
+          'Start Camera'
+        )}
       </Button>
     </Box>
   );

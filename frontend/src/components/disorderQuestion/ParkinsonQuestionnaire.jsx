@@ -252,7 +252,13 @@ const ParkinsonQuestionnaire = () => {
   };
 
   const handleSkip = () => {
-    try { localStorage.setItem('parkinsons_questionnaire_skipped', 'true'); } catch (e) {}
+    try {
+      localStorage.setItem('parkinsons_questionnaire_skipped', 'true');
+      localStorage.setItem(
+        'parkinsons_questionnaire',
+        JSON.stringify({ skipped: true, skippedAt: Date.now(), source: 'debug' })
+      );
+    } catch (e) {}
     navigate(`/assessment?disorder=parkinsons`);
   };
 

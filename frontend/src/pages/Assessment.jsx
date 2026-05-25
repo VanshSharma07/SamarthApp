@@ -26,7 +26,8 @@ import {
   TouchApp as TapIcon,
   ArrowBack as BackIcon,
   Mic as MicIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Face as FaceIcon
 } from '@mui/icons-material';
 import { Psychology as PsychologyIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -36,7 +37,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Import assessment components
 import EyeMovement from '../components/assessments/EyeMovement/EyeMovementTest';
-// Facial Symmetry assessment removed as per minimal screening requirements
+import FacialSymmetry from '../components/assessments/FacialSymmetry';
 import Tremor from '../components/assessments/Tremor';
 import ResponseTime from '../components/assessments/ResponseTime';
 import GaitAnalysis from '../components/assessments/GaitAnalysis';
@@ -129,7 +130,15 @@ const Assessment = () => {
     //   route: '/assessment/neck-mobility',
     //   color: '#009688' // Teal
     // },
-    // Facial Symmetry assessment removed (low overall value across disorders)
+    {
+      id: 'facialSymmetry',
+      title: 'Facial Symmetry Analysis',
+      description: 'Analyze facial muscle symmetry and neurological indicators.',
+      icon: FaceIcon,
+      component: FacialSymmetry,
+      route: '/assessment/facial-symmetry',
+      color: '#009688' // Teal
+    },
     {
       id: 'tremor',
       title: 'Tremor Assessment',
@@ -247,6 +256,18 @@ const Assessment = () => {
       'wordList',
       'stroop',
       'conversationalBot'
+    ],
+    als: [
+      'eyeMovement',
+      'tremor',
+      'responseTime',
+      'fingerTapping',
+      'speechPattern',
+      'facialSymmetry'
+    ],
+    'bells-palsy': [
+      'facialSymmetry',
+      'eyeMovement'
     ]
   };
 
@@ -254,7 +275,9 @@ const Assessment = () => {
   const disorderInfo = {
     parkinsons: "Parkinson's",
     epilepsy: 'Epilepsy',
-    alzheimers: "Alzheimer's"
+    alzheimers: "Alzheimer's",
+    als: 'ALS',
+    'bells-palsy': "Bell's Palsy"
   };
 
   // Parse disorder from query string
@@ -265,7 +288,8 @@ const Assessment = () => {
     else setSelectedDisorder(null);
   }, [location.search]);
 
-  // If a disorder is specified, require that its questionnaire has been submitted
+  // Questionnaire check removed to allow skipping directly to assessment
+  /*
   useEffect(() => {
     if (!selectedDisorder) return;
     const key = `${selectedDisorder}_questionnaire`;
@@ -275,6 +299,7 @@ const Assessment = () => {
       navigate(`/disorders/${selectedDisorder}`);
     }
   }, [selectedDisorder, navigate]);
+  */
 
   // Filter assessmentTypes based on selected disorder (fall back to full list)
   const filteredAssessmentTypes = useMemo(() => {
@@ -310,13 +335,17 @@ const Assessment = () => {
       type: currentAssessment,
       timestamp: new Date().toISOString(),
       metrics,
-      userId: user.id
+      userId: user.id || user._id || user.uid
     };
     
     try {
       // Send assessment data to backend
-      // await assessmentService.saveAssessment(assessmentData);
-      console.log('Assessment completed:', assessmentData);
+      const result = await assessmentService.saveAssessment(
+        assessmentData.userId, 
+        assessmentData.type, 
+        assessmentData.metrics
+      );
+      console.log('Assessment saved to DB:', result);
       
       // Mark current assessment as completed
       const updatedCompletedAssessments = [...completedAssessments];
@@ -441,7 +470,7 @@ const Assessment = () => {
           </Box>
           
           <AssessmentComponent 
-            userId={user.id}
+            userId={user.id || user._id || user.uid}
             onComplete={(data) => stopAssessment({
               ...data,
               assessmentType: assessment.id

@@ -135,10 +135,11 @@ const Analytics = () => {
       word_list: "Word List Memory Test",
       stroop: "Stroop Test",
       // neuro: "Neuro (EEG/ECG) Assessment",
-      hyperventilation: "Hyperventilation Response Test"
+      hyperventilation: "Hyperventilation Response Test",
+      neurobot: "Conversational Screening"
     };
 
-    return typeMap[type] || type;
+    return typeMap[type] || typeMap[type.toLowerCase()] || type;
   };
 
   // Handle seeding test data
@@ -418,6 +419,10 @@ const Analytics = () => {
                       <MenuItem
                         onClick={() => handleFilterSelect("eyeMovement")}>
                         Eye Movement
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => handleFilterSelect("neurobot")}>
+                        Conversational Screening
                       </MenuItem>
                     </Menu>
                     <Button
