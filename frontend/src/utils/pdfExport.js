@@ -111,21 +111,39 @@ export const exportAssessmentReportToPdf = async (userId, assessmentData, return
       if (!data) return;
       
       const displayName = getAssessmentDisplayName(type);
-      const date = new Date(data.timestamp).toLocaleDateString();
+      const date = data.timestamp ? new Date(data.timestamp).toLocaleDateString() : 'N/A';
       let metrics = 'No metrics available';
+      const normalizedType = String(type).trim().toLowerCase();
       
       if (data.metrics) {
         // Format metrics based on assessment type
-        switch (type) {
+        switch (normalizedType) {
           case 'tremor':
             metrics = `Severity: ${data.metrics.severity || 'N/A'}, Frequency: ${data.metrics.tremor_frequency || 'N/A'} Hz`;
             break;
           case 'speech':
+          case 'speechpattern':
+          case 'speech_pattern':
             metrics = `Clarity: ${data.metrics.clarity?.score || 'N/A'}/10, Overall: ${data.metrics.overallScore || 'N/A'}/10`;
             break;
-          case 'responseTime':
+          case 'responsetime':
+          case 'response_time':
             metrics = `Avg Response: ${data.metrics.averageResponseTime || 'N/A'} ms`;
             break;
+          case 'gaitanalysis': {
+            const stability = data.metrics.stability?.score ?? data.metrics.stability ?? data.metrics.overall?.stabilityScore ?? 'N/A';
+            const speed = data.metrics.gait?.speed ?? data.metrics.walkingSpeed ?? 'N/A';
+            const cadence = data.metrics.gait?.cadence ?? data.metrics.cadence ?? 'N/A';
+            metrics = `Stability: ${stability}, Speed: ${speed}, Cadence: ${cadence}`;
+            break;
+          }
+          case 'gait_analysis': {
+            const stability = data.metrics.stability?.score ?? data.metrics.stability ?? data.metrics.overall?.stabilityScore ?? 'N/A';
+            const speed = data.metrics.gait?.speed ?? data.metrics.walkingSpeed ?? 'N/A';
+            const cadence = data.metrics.gait?.cadence ?? data.metrics.cadence ?? 'N/A';
+            metrics = `Stability: ${stability}, Speed: ${speed}, Cadence: ${cadence}`;
+            break;
+          }
           default:
             metrics = 'See details below';
         }
@@ -176,19 +194,9 @@ export const exportAssessmentReportToPdf = async (userId, assessmentData, return
         doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
         
-        // Create a table for the metrics
-        const metricsData = [];
-        Object.entries(data.metrics).forEach(([key, value]) => {
-          if (typeof value === 'object') {
-            Object.entries(value).forEach(([subKey, subValue]) => {
-              if (typeof subValue !== 'object') {
-                metricsData.push([`${formatMetricName(key)}: ${formatMetricName(subKey)}`, subValue.toString()]);
-              }
-            });
-          } else if (typeof value !== 'object' && value !== null && value !== undefined) {
-            metricsData.push([formatMetricName(key), value.toString()]);
-          }
-        });
+        // Recursively flatten nested metrics so detailed gait parameters are fully included
+        const flattenedMetrics = flattenMetrics(data.metrics);
+        const metricsData = flattenedMetrics.map(({ key, value }) => [formatMetricPath(key), value]);
         
         if (metricsData.length > 0) {
           doc.autoTable({
@@ -303,12 +311,27 @@ function getAssessmentDisplayName(type) {
   const displayNames = {
     tremor: 'Tremor',
     speech: 'Speech Pattern',
+    speechPattern: 'Speech Pattern',
     responseTime: 'Response Time',
     neckMobility: 'Neck Mobility',
     gait: 'Gait Analysis',
+    gaitAnalysis: 'Gait Analysis',
     fingerTapping: 'Finger Tapping',
     facialSymmetry: 'Facial Symmetry',
-    eyeMovement: 'Eye Movement'
+    eyeMovement: 'Eye Movement',
+    GAIT_ANALYSIS: 'Gait Analysis',
+    SPEECH_PATTERN: 'Speech Pattern',
+    RESPONSE_TIME: 'Response Time',
+    FINGER_TAPPING: 'Finger Tapping',
+    FACIAL_SYMMETRY: 'Facial Symmetry',
+    EYE_MOVEMENT: 'Eye Movement',
+    NECK_MOBILITY: 'Neck Mobility',
+    HYPERVENTILATION_TEST: 'Hyperventilation',
+    hyperventilation: 'Hyperventilation',
+    stroop: 'Stroop Test',
+    wordlist: 'Word List Memory Test',
+    word_list: 'Word List Memory Test',
+    neurobot: 'Conversational Screening'
   };
   
   return displayNames[type] || type;
@@ -324,6 +347,60 @@ function formatMetricName(name) {
     .replace(/([A-Z])/g, ' $1')
     .replace(/_/g, ' ')
     .replace(/^./, str => str.toUpperCase());
+}
+
+function formatMetricPath(path) {
+  return path
+    .split('.')
+    .map(part => part.replace(/\[(\d+)\]/g, ' $1').trim())
+    .map(formatMetricName)
+    .join(' > ');
+}
+
+function flattenMetrics(obj, parentKey = '') {
+  const result = [];
+
+  if (obj === null || obj === undefined) {
+    return result;
+  }
+
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) {
+      return result;
+    }
+
+    const allPrimitive = obj.every(v => v === null || ['string', 'number', 'boolean'].includes(typeof v));
+    if (allPrimitive) {
+      const joined = obj
+        .filter(v => v !== null && v !== undefined && String(v).trim() !== '')
+        .map(v => String(v))
+        .join(', ');
+      if (joined) {
+        result.push({ key: parentKey || 'value', value: joined });
+      }
+      return result;
+    }
+
+    obj.forEach((item, index) => {
+      const arrayKey = parentKey ? `${parentKey}[${index}]` : `[${index}]`;
+      result.push(...flattenMetrics(item, arrayKey));
+    });
+    return result;
+  }
+
+  if (typeof obj === 'object') {
+    Object.entries(obj).forEach(([key, value]) => {
+      const newKey = parentKey ? `${parentKey}.${key}` : key;
+      result.push(...flattenMetrics(value, newKey));
+    });
+    return result;
+  }
+
+  const scalar = String(obj).trim();
+  if (scalar) {
+    result.push({ key: parentKey || 'value', value: scalar });
+  }
+  return result;
 }
 
 // Helper functions

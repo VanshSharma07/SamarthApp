@@ -26,6 +26,82 @@ async function callLLM(prompt) {
   return text;
 }
 
+function extractJsonString(text) {
+  if (!text) return "";
+  let jsonStr = text;
+  const firstBrace = jsonStr.indexOf("{");
+  const lastBrace = jsonStr.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+  }
+
+  return jsonStr.replace(/```json/g, "").replace(/```/g, "").trim();
+}
+
+function sanitizeJsonString(jsonStr) {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < jsonStr.length; i += 1) {
+    const ch = jsonStr[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        result += ch;
+        continue;
+      }
+
+      if (ch === "\\") {
+        escaped = true;
+        result += ch;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = false;
+        result += ch;
+        continue;
+      }
+
+      if (ch === "\n" || ch === "\r") {
+        result += "\\n";
+        continue;
+      }
+
+      if (ch === "\t") {
+        result += "\\t";
+        continue;
+      }
+
+      result += ch;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+    }
+
+    result += ch;
+  }
+
+  return result.replace(/,\s*([}\]])/g, "$1");
+}
+
+function parseLlmJson(text) {
+  const raw = extractJsonString(text);
+  if (!raw) {
+    throw new Error("Empty JSON response");
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    const sanitized = sanitizeJsonString(raw);
+    return JSON.parse(sanitized);
+  }
+}
+
 // =========================
 // 1. DETECT LANGUAGE
 // =========================
@@ -98,15 +174,7 @@ OUTPUT EXCLUSIVELY AS A VALID RAW JSON OBJECT EXACTLY LIKE THIS:
       return text;
     }
 
-    let jsonStr = text;
-    const firstBrace = jsonStr.indexOf('{');
-    const lastBrace = jsonStr.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
-        jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-    }
-
-    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonStr);
+    return parseLlmJson(text);
   } catch (e) {
     console.error("LLM Parse Error:", e);
     return {
@@ -155,16 +223,7 @@ ENSURE the output starts with { and ends with }. No additional dialogue or forma
         return text;
       }
 
-      let jsonStr = text;
-      const firstBrace = jsonStr.indexOf('{');
-      const lastBrace = jsonStr.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
-          jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-      }
-
-      // Clean up potential markdown code blocks
-      jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(jsonStr);
+      return parseLlmJson(text);
   } catch (e) {
       console.error("Report Generation Failed:", e);
       return {

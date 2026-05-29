@@ -398,7 +398,40 @@ function addGaitSection(doc, data) {
   doc.fontSize(20)
      .fillColor('#333333')
      .text('Gait Analysis Assessment', { underline: true });
-  // Basic gait information...
+
+  doc.moveDown();
+  doc.fontSize(12)
+    .fillColor('#555555')
+    .text(`Assessment completed on ${data?.timestamp ? format(new Date(data.timestamp), 'PPpp') : 'N/A'}`);
+
+  doc.moveDown();
+  doc.fontSize(14)
+    .fillColor('#333333')
+    .text('Detailed Gait Metrics:');
+
+  doc.moveDown();
+  const gaitMetrics = flattenObject(data?.metrics || {});
+
+  if (gaitMetrics.length === 0) {
+   doc.fontSize(12)
+     .fillColor('#555555')
+     .text('No gait metrics available.');
+   return;
+  }
+
+  gaitMetrics.forEach((item) => {
+   if (doc.y > doc.page.height - 70) {
+    doc.addPage();
+    doc.fontSize(14)
+      .fillColor('#333333')
+      .text('Detailed Gait Metrics (continued):');
+    doc.moveDown();
+   }
+
+   doc.fontSize(11)
+     .fillColor('#555555')
+     .text(`${formatMetricPath(item.key)}: ${item.value}`);
+  });
 }
 
 function addFingerTappingSection(doc, data) {
@@ -489,4 +522,58 @@ function addFooter(doc) {
           { align: 'center' }
        );
   }
+}
+
+function flattenObject(input, parentKey = '') {
+  const rows = [];
+
+  if (input === null || input === undefined) {
+    return rows;
+  }
+
+  if (Array.isArray(input)) {
+    if (input.length === 0) {
+      return rows;
+    }
+
+    const allPrimitive = input.every(v => v === null || ['string', 'number', 'boolean'].includes(typeof v));
+    if (allPrimitive) {
+      const joined = input
+        .filter(v => v !== null && v !== undefined && String(v).trim() !== '')
+        .map(v => String(v))
+        .join(', ');
+      if (joined) {
+        rows.push({ key: parentKey || 'value', value: joined });
+      }
+      return rows;
+    }
+
+    input.forEach((item, index) => {
+      const nextKey = parentKey ? `${parentKey}[${index}]` : `[${index}]`;
+      rows.push(...flattenObject(item, nextKey));
+    });
+    return rows;
+  }
+
+  if (typeof input === 'object') {
+    Object.entries(input).forEach(([key, value]) => {
+      const nextKey = parentKey ? `${parentKey}.${key}` : key;
+      rows.push(...flattenObject(value, nextKey));
+    });
+    return rows;
+  }
+
+  const scalar = String(input).trim();
+  if (scalar) {
+    rows.push({ key: parentKey || 'value', value: scalar });
+  }
+  return rows;
+}
+
+function formatMetricPath(metricPath) {
+  return metricPath
+    .split('.')
+    .map(part => part.replace(/\[(\d+)\]/g, ' $1').trim())
+    .map(part => part.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()))
+    .join(' > ');
 }
